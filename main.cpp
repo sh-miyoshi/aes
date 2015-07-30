@@ -10,10 +10,11 @@ using namespace std;
 
 void PrintHelpMessage(){
 	std::cerr<<"Usage: -e plain_file cipher_file"<<std::endl;
-	std::cerr<<"    or -d cipher_file"<<std::endl;
+	std::cerr<<"    or -d cipher_file plain_file"<<std::endl;
 }
 
 int main(int argc,char *argv[]){
+	// set encryption or decription
 	enum Mode{
 		MODE_ENCRYPT,
 		MODE_DECRYPT
@@ -21,48 +22,45 @@ int main(int argc,char *argv[]){
 	Mode mode=MODE_ENCRYPT;
 	std::string input_fname;
 	std::string output_fname;
-	if(argc==4){// maybe encryption
-		if(strcmp(argv[1],"-e")==0){
-			input_fname=argv[2];
-			output_fname=argv[3];
+	if(argc==4){
+		if(strcmp(argv[1],"-e")==0)
 			mode=MODE_ENCRYPT;
-			goto PROCESS;
-		}
-	}else if(argc==3){// maybe decryption
-		if(strcmp(argv[1],"-d")==0){
-			input_fname=argv[2];
+		else if(strcmp(argv[1],"-d")==0)
 			mode=MODE_DECRYPT;
-			goto PROCESS;
-		}
-	}
-
-	// Input error
-	PrintHelpMessage();
-	return 1;
-PROCESS:
-	std::string password="test";
-	AES aes(AES::TYPE_256,password);
-
-	FILE *fp=fopen(input_fname.c_str(),"rb");
-	if(!fp){
-		std::cerr<<"cannot open file "<<input_fname<<std::endl;
+		else
+			goto INPUT_ERROR;
+		input_fname=argv[2];
+		output_fname=argv[3];
+	}else{
+INPUT_ERROR:
+		// Input error
+		PrintHelpMessage();
 		return 1;
 	}
 
-	unsigned char buf[128];
-	FILE *out_fp;
+	// set password
+	std::string password="test";
+	AES aes(AES::TYPE_256,password);
+
+	// file configuration
+	FILE *fp_in=fopen(input_fname.c_str(),"rb");
+	if(!fp_in){
+		std::cerr<<"cannot open file "<<input_fname<<std::endl;
+		return 1;
+	}
+	FILE *fp_out=fopen(output_fname.c_str(),"wb");
+	if(!fp_out){
+		std::cerr<<"cannot open file "<<output_fname<<std::endl;
+		return 1;
+	}
+
+	// main routine
+	unsigned char buf[16];
 	switch(mode){
 	case MODE_ENCRYPT:
-		out_fp=fopen(output_fname.c_str(),"wb");
-		if(!out_fp){
-			std::cerr<<"cannot open file "<<output_fname<<std::endl;
-			return 1;
-		}
-
-		// data encrypting
-		while(feof(fp)){
+		while(feof(fp_in)==0){
 			memset(buf,0,sizeof(buf));
-			fread(buf,sizeof(char),16,fp);
+			fread(buf,sizeof(char),16,fp_in);
 			__m128i data=_mm_set_epi8(
 				buf[ 0],buf[ 1],buf[ 2],buf[ 3],
 				buf[ 4],buf[ 5],buf[ 6],buf[ 7],
@@ -71,13 +69,26 @@ PROCESS:
 			);
 			__m128i ret=aes.Encrypt(data);
 			uint8_t *temp=(uint8_t *)&ret;
-			fwrite(temp,16,1,fp);
+			fwrite(temp,sizeof(uint8_t),16,fp_out);
 		}
-
-		fclose(out_fp);
 		break;
 	case MODE_DECRYPT:
+		while(feof(fp_in)==0){
+			memset(buf,0,sizeof(buf));
+			fread(buf,sizeof(char),16,fp_in);
+			__m128i data=_mm_set_epi8(
+				buf[ 0],buf[ 1],buf[ 2],buf[ 3],
+				buf[ 4],buf[ 5],buf[ 6],buf[ 7],
+				buf[ 8],buf[ 9],buf[10],buf[11],
+				buf[12],buf[13],buf[14],buf[15]
+			);
+			__m128i ret=aes.Decrypt(data);
+			uint8_t *temp=(uint8_t *)&ret;
+			fwrite(temp,sizeof(uint8_t),16,fp_out);
+		}
 		break;
 	}
-	fclose(fp);
+	fclose(fp_out);
+	fclose(fp_in);
+	return 0;
 }
