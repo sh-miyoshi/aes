@@ -1,30 +1,13 @@
 #pragma once
 
-#include <stdio.h>
 #include <string>
+#include <wmmintrin.h>
 
 class AES{
-	static const int BLOCK_SIZE=16;// 128/8
+	int ROUND_NUM;
+	__m128i bkey;
 
-	unsigned char *roundKey;
-	int ROUND_NUM,WORD_KEY_LENGTH;
-
-	void GetBinaryData(unsigned char *ret,std::string *data);
-	std::string GetStringData(const unsigned char *buf,int size);
-	void GetBinaryKey(unsigned char *ret,std::string key);
-
-	unsigned char ExtMul(unsigned char data,int n);
-	void SubWord(unsigned char *w);
-	void RotWord(unsigned char *w);
-	void KeyExpansion(unsigned char *key);
-
-	void SubBytes(unsigned char *data);
-	void ShiftRows(unsigned char *data);
-	void MixColumns(unsigned char *data);
-	void InvSubBytes(unsigned char *data);
-	void InvShiftRows(unsigned char *data);
-	void InvMixColumns(unsigned char *data);
-	void AddRoundKey(unsigned char *data,int n);
+	__m128i GetBinaryKey(std::string key);
 public:
 	enum Type{
 		TYPE_128,
@@ -35,6 +18,6 @@ public:
 	AES(Type type,std::string key);
 	~AES();
 
-	std::string Encrypt(std::string data);
-	std::string Decrypt(std::string data);
+	__m128i Encrypt(__m128i data);
+	__m128i Decrypt(__m128i data);
 };

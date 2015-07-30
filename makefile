@@ -1,6 +1,6 @@
 CXX = g++
 TARGET = aes.exe
-CXXFLAGS = -O2
+CXXFLAGS = -O2 -maes -mpclmul
 SRCS = main.cpp aes.cpp
 OBJS := $(SRCS:.cpp=.o)
 
