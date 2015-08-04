@@ -55,36 +55,26 @@ INPUT_ERROR:
 	}
 
 	// main routine
-	unsigned char buf[16];
+	char buf[16];
 	switch(mode){
 	case MODE_ENCRYPT:
 		while(feof(fp_in)==0){
 			memset(buf,0,sizeof(buf));
-			fread(buf,sizeof(char),16,fp_in);
-			__m128i data=_mm_set_epi8(
-				buf[ 0],buf[ 1],buf[ 2],buf[ 3],
-				buf[ 4],buf[ 5],buf[ 6],buf[ 7],
-				buf[ 8],buf[ 9],buf[10],buf[11],
-				buf[12],buf[13],buf[14],buf[15]
-			);
+			int s=fread(buf,sizeof(char),16,fp_in);
+			__m128i data=_mm_load_si128((__m128i *)buf);
 			__m128i ret=aes.Encrypt(data);
-			uint8_t *temp=(uint8_t *)&ret;
-			fwrite(temp,sizeof(uint8_t),16,fp_out);
+			_mm_store_si128((__m128i *)buf,data);
+			fwrite(buf,sizeof(char),s,fp_out);
 		}
 		break;
 	case MODE_DECRYPT:
 		while(feof(fp_in)==0){
 			memset(buf,0,sizeof(buf));
-			fread(buf,sizeof(char),16,fp_in);
-			__m128i data=_mm_set_epi8(
-				buf[ 0],buf[ 1],buf[ 2],buf[ 3],
-				buf[ 4],buf[ 5],buf[ 6],buf[ 7],
-				buf[ 8],buf[ 9],buf[10],buf[11],
-				buf[12],buf[13],buf[14],buf[15]
-			);
+			int s=fread(buf,sizeof(char),16,fp_in);
+			__m128i data=_mm_load_si128((__m128i *)buf);
 			__m128i ret=aes.Decrypt(data);
-			uint8_t *temp=(uint8_t *)&ret;
-			fwrite(temp,sizeof(uint8_t),16,fp_out);
+			_mm_store_si128((__m128i *)buf,data);
+			fwrite(buf,sizeof(char),s,fp_out);
 		}
 		break;
 	}

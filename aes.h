@@ -4,10 +4,15 @@
 #include <wmmintrin.h>
 
 class AES{
-	int ROUND_NUM;
-	__m128i bkey;
+	const int WORD_KEY_LENGTH,BYTE_KEY_LENGTH;
+	const int ROUND_NUM;
 
-	__m128i GetBinaryKey(std::string key);
+	static const int ROUND_NUM_MAX=14;
+	__m128i roundKey[ROUND_NUM_MAX+1];
+
+	void SubWord(unsigned char *w);
+	void RotWord(unsigned char *w);
+	void GenerateRoundKey(std::string key);
 public:
 	enum Type{
 		TYPE_128,
