@@ -55,7 +55,7 @@ INPUT_ERROR:
 	}
 
 	// main routine
-	char buf[16];
+	char buf[16] __attribute__((aligned(16)));
 	switch(mode){
 	case MODE_ENCRYPT:
 		while(feof(fp_in)==0){
@@ -63,7 +63,7 @@ INPUT_ERROR:
 			int s=fread(buf,sizeof(char),16,fp_in);
 			__m128i data=_mm_load_si128((__m128i *)buf);
 			__m128i ret=aes.Encrypt(data);
-			_mm_store_si128((__m128i *)buf,data);
+			_mm_store_si128((__m128i *)buf,ret);
 			fwrite(buf,sizeof(char),s,fp_out);
 		}
 		break;
@@ -73,7 +73,7 @@ INPUT_ERROR:
 			int s=fread(buf,sizeof(char),16,fp_in);
 			__m128i data=_mm_load_si128((__m128i *)buf);
 			__m128i ret=aes.Decrypt(data);
-			_mm_store_si128((__m128i *)buf,data);
+			_mm_store_si128((__m128i *)buf,ret);
 			fwrite(buf,sizeof(char),s,fp_out);
 		}
 		break;
