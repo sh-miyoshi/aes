@@ -3,23 +3,28 @@
 #include <string>
 #include <wmmintrin.h>
 
-//void AES_Setup(__m128i *enc_key,__m128i *dec_key,std::string user_key);
-//__m128i AES_Encrypt(__m128i data,__m128i *enc_key);
-//__m128i AES_Decrypt(__m128i data,__m128i *dec_key);
+class AES{
+	static const char MAX_NR=14;// max no of rounds
+	__m128i enc_key[MAX_NR+2],dec_key[MAX_NR+2];
+	unsigned char Nr;// number of rounds
+	__m128i iv;// initialization vector
 
-#define MAX_NR 14   /* max no of rounds */
-#define NB 4        /* no of words in cipher blk */
+	__m128i AES_128_ASSIST(__m128i temp1,__m128i temp2);
+	void AES_128_Key_Expansion(__m128i *key,const unsigned char *userKey);
+public:
+	enum Type{
+		TYPE_128,
+		TYPE_192,
+		TYPE_256
+	};
 
-typedef struct AESContext AESContext;
+	AES(Type type,std::string key);
+	~AES(){}
 
-struct AESContext {
-    unsigned int keysched[(MAX_NR + 2) * NB];
-    unsigned int invkeysched[(MAX_NR + 2) * NB];
-    unsigned int iv[NB];
-    unsigned int Nr; /* number of rounds */
-    unsigned int offset; /* offset for aligned key expansion */
+	__m128i Encrypt(__m128i data);
+	__m128i Decrypt(__m128i data);
+
+//	void Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length);
+//	void Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length);
+//	void Encrypt_CBC(FILE input);
 };
-
-void aes_setup(AESContext * ctx, unsigned char *key, int keylen);
-void aes_encrypt_cbc(unsigned char *blk, int len, AESContext * ctx);
-void aes_decrypt_cbc(unsigned char *blk, int len, AESContext * ctx);
