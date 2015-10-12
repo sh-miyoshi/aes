@@ -2,35 +2,36 @@
 #include <stdlib.h>
 #include "aes.h"
 
-AES::AES(Type type,std::string key,const char *iv){
+AES::AES(std::string key,unsigned int key_bit_length,const char *init_vec){
+	unsigned int kl_byte=key_bit_length/8;
 	unsigned char uk[32];
-	switch(type){
-	case TYPE_128:
-		Nr=10;
-		for(int i=0;i<16;i++)
-			uk[i]=key[i%key.size()];
+	for(int i=0;i<kl_byte;i++)
+		uk[i]=key[i%key.size()];
+	Nr=6+(kl_byte/4);
+	switch(key_bit_length){
+	case 128:
 		AES_128_Key_Expansion(enc_key,uk);
 		break;
-	case TYPE_192:
-		Nr=12;
-		for(int i=0;i<24;i++)
-			uk[i]=key[i%key.size()];
+	case 192:
 		AES_192_Key_Expansion(enc_key,uk);
 		break;
-	case TYPE_256:
-		std::cerr<<"256-bit AES is not supported now\n";
-		exit(1);
+	case 256:
+		AES_256_Key_Expansion(enc_key,uk);
 		break;
+	default:
+		std::cerr<<key_bit_length<<"-bit AES is not supported in this program\n";
+		exit(1);
 	}
+
 	dec_key[Nr]=enc_key[0];
 	for(int i=1;i<Nr;i++)
 		dec_key[Nr-i]=_mm_aesimc_si128(enc_key[i]);
 	dec_key[0]=enc_key[Nr];
 
-	if(iv==NULL)
+	if(init_vec==NULL)
 		this->iv=_mm_setzero_si128();
 	else
-		this->iv=_mm_loadu_si128((__m128i *)iv);
+		this->iv=_mm_loadu_si128((__m128i *)init_vec);
 }
 
 __m128i AES::Encrypt(__m128i data){
@@ -79,8 +80,33 @@ void AES::AES_192_ASSIST(__m128i &temp1,__m128i &temp2,__m128i &temp3){
     temp3=_mm_xor_si128(temp3,temp2);
 }
 
-void AES::AES_128_Key_Expansion(__m128i *key,const unsigned char *userKey){
-	__m128i temp1=_mm_loadu_si128((__m128i *)userKey),temp2;
+void AES::AES_256_ASSIST_1(__m128i &temp1,__m128i &temp2){
+	__m128i temp4;
+	temp2=_mm_shuffle_epi32(temp2,0xff);
+	temp4=_mm_slli_si128(temp1,0x4);
+	temp1=_mm_xor_si128(temp1,temp4);
+	temp4=_mm_slli_si128(temp4,0x4);
+	temp1=_mm_xor_si128(temp1,temp4);
+	temp4=_mm_slli_si128(temp4,0x4);
+	temp1=_mm_xor_si128(temp1,temp4);
+	temp1=_mm_xor_si128(temp1,temp2);
+}
+
+void AES::AES_256_ASSIST_2(__m128i &temp1,__m128i &temp3){
+	__m128i temp2,temp4;
+	temp4=_mm_aeskeygenassist_si128(temp1,0x0);
+	temp2=_mm_shuffle_epi32(temp4,0xaa);
+	temp4=_mm_slli_si128(temp3,0x4);
+	temp3=_mm_xor_si128(temp3,temp4);
+	temp4=_mm_slli_si128(temp4,0x4);
+	temp3=_mm_xor_si128(temp3,temp4);
+	temp4=_mm_slli_si128(temp4,0x4);
+	temp3=_mm_xor_si128(temp3,temp4);
+	temp3=_mm_xor_si128(temp3,temp2);
+}
+
+void AES::AES_128_Key_Expansion(__m128i *key,const unsigned char *user_key){
+	__m128i temp1=_mm_loadu_si128((__m128i *)user_key),temp2;
 	key[0]=temp1;
 	for(int i=1;i<=10;i++){
 		switch(i){
@@ -100,10 +126,10 @@ void AES::AES_128_Key_Expansion(__m128i *key,const unsigned char *userKey){
 	}
 }
 
-void AES::AES_192_Key_Expansion(__m128i *key,const unsigned char *userKey){
+void AES::AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key){
 	__m128i temp1,temp2,temp3;
-	temp1=_mm_loadu_si128((__m128i*)userKey);
-	temp3=_mm_loadu_si128((__m128i*)(userKey+16));
+	temp1=_mm_loadu_si128((__m128i*)user_key);
+	temp3=_mm_loadu_si128((__m128i*)(user_key+16));
 	for(int i=0;i<12;i+=3){
 		key[i]=temp1;
 		key[i+1]=temp3;
@@ -126,4 +152,29 @@ void AES::AES_192_Key_Expansion(__m128i *key,const unsigned char *userKey){
 	}
 	key[12]=temp1;
 	key[13]=temp3;
+}
+
+void AES::AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key){
+	__m128i temp1,temp2,temp3;
+	temp1=_mm_loadu_si128((__m128i*)user_key);
+	temp3=_mm_loadu_si128((__m128i*)(user_key+16));
+	key[0]=temp1;
+	key[1]=temp3;
+	for(int i=2;i<=12;i+=2){
+		switch(i){
+		case  2:temp2=_mm_aeskeygenassist_si128(temp3,0x01 );break;
+		case  4:temp2=_mm_aeskeygenassist_si128(temp3,0x02 );break;
+		case  6:temp2=_mm_aeskeygenassist_si128(temp3,0x04 );break;
+		case  8:temp2=_mm_aeskeygenassist_si128(temp3,0x08 );break;
+		case 10:temp2=_mm_aeskeygenassist_si128(temp3,0x010);break;
+		case 12:temp2=_mm_aeskeygenassist_si128(temp3,0x020);break;
+		}
+		AES_256_ASSIST_1(temp1,temp2);
+		key[i]=temp1;
+		AES_256_ASSIST_2(temp1,temp3);
+		key[i+1]=temp3;
+	}
+	temp2=_mm_aeskeygenassist_si128(temp3,0x40);
+	AES_256_ASSIST_1(temp1,temp2);
+	key[14]=temp1;
 }

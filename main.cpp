@@ -9,7 +9,7 @@ int main(){
 	for(int i=0;i<16;i++)
 		cout<<data[i]<<" ";
 	cout<<endl;
-	AES aes(AES::TYPE_192,"123965874012396587404592");
+	AES aes("1239658740123965874045924815",256);
 	__m128i t=_mm_loadu_si128((__m128i *)data);
 	t=aes.Encrypt(t);
 	t=aes.Decrypt(t);
