@@ -1,5 +1,7 @@
-#include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <iostream>
 #include "aes.h"
 
 AES::AES(std::string key,unsigned int key_bit_length,const char *init_vec){
@@ -50,6 +52,78 @@ __m128i AES::Decrypt(__m128i data){
 
 //void AES::Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length){}
 //void AES::Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length){}
+
+void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc){
+	if(cbc){
+		std::cerr<<"cbc mode is not supported now\n";
+		exit(1);
+	}else{
+		FILE *fp_in=fopen(in_fname.c_str(),"rb");
+		FILE *fp_out=fopen(out_fname.c_str(),"wb");
+		if(!fp_in){
+			std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
+			exit(1);
+		}
+		if(!fp_out){
+			std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
+			exit(1);
+		}
+		char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+		while(1){
+			memset(buf,0,sizeof(buf));
+			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
+			if(size<=0)break;
+			int max=((size&15)==0)?size/16:(size/16)+1;
+			for(int i=0;i<max;i++){
+				char t[16]={0};
+				for(int j=0;j<16;j++)
+					t[j]=buf[i*16+j];
+				__m128i data=_mm_loadu_si128((__m128i *)t);
+				data=Encrypt(data);
+				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
+			}
+			fwrite(ret,sizeof(char),max*16,fp_out);
+		}
+		fclose(fp_in);
+		fclose(fp_out);
+	}
+}
+
+void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc){
+	if(cbc){
+		std::cerr<<"cbc mode is not supported now\n";
+		exit(1);
+	}else{
+		FILE *fp_in=fopen(in_fname.c_str(),"rb");
+		FILE *fp_out=fopen(out_fname.c_str(),"wb");
+		if(!fp_in){
+			std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
+			exit(1);
+		}
+		if(!fp_out){
+			std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
+			exit(1);
+		}
+		char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+		while(1){
+			memset(buf,0,sizeof(buf));
+			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
+			if(size<=0)break;
+			int max=((size&15)==0)?size/16:(size/16)+1;
+			for(int i=0;i<max;i++){
+				char t[16]={0};
+				for(int j=0;j<16;j++)
+					t[j]=buf[i*16+j];
+				__m128i data=_mm_loadu_si128((__m128i *)t);
+				data=Decrypt(data);
+				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
+			}
+			fwrite(ret,sizeof(char),max*16,fp_out);
+		}
+		fclose(fp_in);
+		fclose(fp_out);
+	}
+}
 
 __m128i AES::AES_128_ASSIST(__m128i temp1,__m128i temp2){
 	__m128i temp3;

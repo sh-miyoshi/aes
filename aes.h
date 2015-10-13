@@ -4,7 +4,9 @@
 #include <wmmintrin.h>
 
 class AES{
-	static const char MAX_NR=14;// max no of rounds
+	static const int MAX_NR=14;// max no of rounds
+	static const int FILE_READ_SIZE=4096;
+
 	__m128i enc_key[MAX_NR+2],dec_key[MAX_NR+2];
 	unsigned int Nr;// number of rounds
 	__m128i iv;// initialization vector
@@ -22,8 +24,9 @@ public:
 
 	__m128i Encrypt(__m128i data);
 	__m128i Decrypt(__m128i data);
-
 //	void Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length);
 //	void Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length);
-//	void Encrypt_CBC(FILE input);
+
+	void Encrypt(std::string in_fname,std::string out_fname,bool cbc);
+	void Decrypt(std::string in_fname,std::string out_fname,bool cbc);
 };
