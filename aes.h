@@ -29,8 +29,6 @@ public:
 
 	__m128i Encrypt(__m128i data);
 	__m128i Decrypt(__m128i data);
-//	void Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length);
-//	void Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length);
 
 	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
 	void Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);

@@ -50,9 +50,6 @@ __m128i AES::Decrypt(__m128i data){
 	return _mm_aesdeclast_si128(data,dec_key[Nr]);
 }
 
-//void AES::Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length){}
-//void AES::Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length){}
-
 void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
 	if(cbc){
 		std::cerr<<"cbc mode is not supported now\n";
@@ -69,26 +66,46 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			exit(1);
 		}
 		char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+		bool is_padding=false;
 		while(1){
 			memset(buf,0,sizeof(buf));
 			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
 			if(size==0){
+				if(!is_padding){
+					__m128i data;
+					switch(mode){
+					case PADDING_ZERO:
+						break;
+					case PADDING_PKCS_5:
+						for(int i=0;i<16;i++)
+							buf[i]=16;
+						data=_mm_loadu_si128((__m128i *)buf);
+						data=Encrypt(data);
+						_mm_storeu_si128((__m128i *)(buf),data);
+						fwrite(buf,sizeof(char),16,fp_out);
+						break;
+					}
+				}
+				break;
+			}else if(size<FILE_READ_SIZE){
+				int val=0;
+				is_padding=true;
 				switch(mode){
 				case PADDING_ZERO:
 					break;
 				case PADDING_PKCS_5:
-					std::cerr<<"PKCS#5 is not supported now\n";
-					exit(1);
+					val=16-(size&15);
+					for(int i=size;i<size+val;i++)
+						buf[i]=val;
+					size+=val;
 					break;
 				}
-				break;
 			}
 			int max=(int)(size/16.0+0.95);// size>=1なら桁上げして切り捨て
 			for(int i=0;i<max;i++){
 				char t[16]={0};
 				for(int j=0;j<16;j++)
 					t[j]=buf[i*16+j];
-				// debug(ここでパディング)
 				__m128i data=_mm_loadu_si128((__m128i *)t);
 				data=Encrypt(data);
 				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
@@ -143,8 +160,8 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 					}
 					break;
 				case PADDING_PKCS_5:
-					std::cerr<<"PKCS#5 is not supported now\n";
-					exit(1);
+					for(int i=0;i<(16-(int)ret[size-1]);i++)
+						fwrite(&ret[size-16+i],sizeof(char),1,fp_out);
 					break;
 				}
 				break;
@@ -165,8 +182,6 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 						}
 						break;
 					case PADDING_PKCS_5:
-						std::cerr<<"PKCS#5 is not supported now\n";
-						exit(1);
 						break;
 					}
 					break;
