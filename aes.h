@@ -19,6 +19,11 @@ class AES{
 	void AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key);
 public:
+	enum PaddingMode{
+		PADDING_ZERO,
+		PADDING_PKCS_5
+	};
+
 	AES(std::string key,unsigned int key_bit_length,const char *init_vec=NULL);
 	~AES(){}
 
@@ -27,6 +32,6 @@ public:
 //	void Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length);
 //	void Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length);
 
-	void Encrypt(std::string in_fname,std::string out_fname,bool cbc);
-	void Decrypt(std::string in_fname,std::string out_fname,bool cbc);
+	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
+	void Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
 };

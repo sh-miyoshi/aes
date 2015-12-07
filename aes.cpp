@@ -53,7 +53,7 @@ __m128i AES::Decrypt(__m128i data){
 //void AES::Encrypt_CBC(unsigned char *enc,const unsigned char *data,int length){}
 //void AES::Decrypt_CBC(unsigned char *dec,const unsigned char *data,int length){}
 
-void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc){
+void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
 	if(cbc){
 		std::cerr<<"cbc mode is not supported now\n";
 		exit(1);
@@ -72,12 +72,23 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc){
 		while(1){
 			memset(buf,0,sizeof(buf));
 			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
-			if(size<=0)break;
-			int max=((size&15)==0)?size/16:(size/16)+1;
+			if(size==0){
+				switch(mode){
+				case PADDING_ZERO:
+					break;
+				case PADDING_PKCS_5:
+					std::cerr<<"PKCS#5 is not supported now\n";
+					exit(1);
+					break;
+				}
+				break;
+			}
+			int max=(int)(size/16.0+0.9);
 			for(int i=0;i<max;i++){
 				char t[16]={0};
 				for(int j=0;j<16;j++)
 					t[j]=buf[i*16+j];
+				// debug(ここでパディング)
 				__m128i data=_mm_loadu_si128((__m128i *)t);
 				data=Encrypt(data);
 				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
@@ -89,7 +100,7 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc){
 	}
 }
 
-void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc){
+void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
 	if(cbc){
 		std::cerr<<"cbc mode is not supported now\n";
 		exit(1);
@@ -104,21 +115,55 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc){
 			std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
 			exit(1);
 		}
-		char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+		char buf[2][FILE_READ_SIZE],dec[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+		memset(buf[0],0,sizeof(buf[0]));
+		int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in),size2;
+		if(size==0)
+			return;
 		while(1){
-			memset(buf,0,sizeof(buf));
-			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
-			if(size<=0)break;
-			int max=((size&15)==0)?size/16:(size/16)+1;
-			for(int i=0;i<max;i++){
+			if(size<FILE_READ_SIZE){
+				memcpy(buf[1],buf[0],size);
+			}else{
+				memcpy(buf[1],buf[0],FILE_READ_SIZE);
+				memset(buf[0],0,sizeof(buf[0]));
+				size2=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
+				if(size2==0){
+					// buf[1]最後のバイト列はpaddingの可能性
+					std::cerr<<"not imprement now..."<<std::endl;
+					exit(1);
+					break;
+				}
+			}
+			for(int i=0;i<size/16;i++){
 				char t[16]={0};
 				for(int j=0;j<16;j++)
-					t[j]=buf[i*16+j];
+					t[j]=buf[1][i*16+j];
 				__m128i data=_mm_loadu_si128((__m128i *)t);
 				data=Decrypt(data);
-				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
+				_mm_storeu_si128((__m128i *)(dec+(i*16)),data);
 			}
-			fwrite(ret,sizeof(char),max*16,fp_out);
+			memcpy(ret,dec,size);
+			if(size<FILE_READ_SIZE){
+				fwrite(ret,sizeof(char),size-16,fp_out);
+				switch(mode){// remove padding
+				case PADDING_ZERO:
+					for(int i=size-16;i<size;i++){
+						if(ret[i]!=0)
+							fwrite(&ret[i],sizeof(char),1,fp_out);
+						else
+							break;
+					}
+					break;
+				case PADDING_PKCS_5:
+					std::cerr<<"PKCS#5 is not supported now\n";
+					exit(1);
+					break;
+				}
+				break;
+			}else{
+				size=size2;
+				fwrite(ret,sizeof(char),FILE_READ_SIZE,fp_out);
+			}
 		}
 		fclose(fp_in);
 		fclose(fp_out);
