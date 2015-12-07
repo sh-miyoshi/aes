@@ -83,7 +83,7 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 				}
 				break;
 			}
-			int max=(int)(size/16.0+0.9);
+			int max=(int)(size/16.0+0.95);// size>=1なら桁上げして切り捨て
 			for(int i=0;i<max;i++){
 				char t[16]={0};
 				for(int j=0;j<16;j++)
@@ -117,23 +117,11 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 		}
 		char buf[2][FILE_READ_SIZE],dec[FILE_READ_SIZE],ret[FILE_READ_SIZE];
 		memset(buf[0],0,sizeof(buf[0]));
-		int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in),size2;
+		int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
 		if(size==0)
 			return;
 		while(1){
-			if(size<FILE_READ_SIZE){
-				memcpy(buf[1],buf[0],size);
-			}else{
-				memcpy(buf[1],buf[0],FILE_READ_SIZE);
-				memset(buf[0],0,sizeof(buf[0]));
-				size2=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
-				if(size2==0){
-					// buf[1]最後のバイト列はpaddingの可能性
-					std::cerr<<"not imprement now..."<<std::endl;
-					exit(1);
-					break;
-				}
-			}
+			memcpy(buf[1],buf[0],size);
 			for(int i=0;i<size/16;i++){
 				char t[16]={0};
 				for(int j=0;j<16;j++)
@@ -161,7 +149,29 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 				}
 				break;
 			}else{
-				size=size2;
+				memcpy(buf[1],buf[0],FILE_READ_SIZE);
+				memset(buf[0],0,sizeof(buf[0]));
+				int s2=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
+				if(s2==0){
+					fwrite(ret,sizeof(char),FILE_READ_SIZE-16,fp_out);
+					// buf[1]最後のバイト列はpaddingの可能性
+					switch(mode){
+					case PADDING_ZERO:
+						for(int i=FILE_READ_SIZE-16;i<FILE_READ_SIZE;i++){
+							if(ret[i]!=0)
+								fwrite(&ret[i],sizeof(char),1,fp_out);
+							else
+								break;
+						}
+						break;
+					case PADDING_PKCS_5:
+						std::cerr<<"PKCS#5 is not supported now\n";
+						exit(1);
+						break;
+					}
+					break;
+				}
+				size=s2;
 				fwrite(ret,sizeof(char),FILE_READ_SIZE,fp_out);
 			}
 		}
