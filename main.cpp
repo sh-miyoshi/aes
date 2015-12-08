@@ -7,9 +7,9 @@ using namespace std;
 
 void ExitArgvError(){
 	// Show help message
-	cerr<<"Usage: aes.exe [options] input_file output_file"<<endl;
-	cerr<<"  --enc or --dec"<<endl;
+	cerr<<"Usage: aes.exe (--enc or --dec) [options] input_file output_file"<<endl;
 	cerr<<"  --cbc [if you want to encrypt(or decrypt) with cbc mode]"<<endl;
+	cerr<<"  --pad-zero or --pad-pkcs5 [select padding type(zero or PKCS#5, default is PKCS#5)]"<<endl;
 	cerr<<"  -l \"key_length\" [key bit length(128,192,256)]"<<endl;
 	cerr<<"  -p \"password\""<<endl;
 	exit(1);
@@ -28,20 +28,29 @@ int main(int argc,char *argv[]){
 	std::vector<std::string> opt_non=opt.GetOptionNon();
 	bool cbc=false;
 	Mode mode=MODE_NON;
+	AES::PaddingMode padding_mode=AES::PADDING_PKCS_5;
 	for(int i=0;i<opt_non.size();i++){
-		if(opt_non=="--cbc")
+		if(opt_non[i]=="--cbc")
 			cbc=true;
-		else if(opt_non=="--enc"){
+		else if(opt_non[i]=="--enc"){
 			if(mode==MODE_NON)
 				mode=MODE_ENCRYPT;
-			else
-				ExitArgvError();
-		}else if(opt_non=="--dec"){
+			else{
+				cerr<<"Please input --enc or --dec"<<endl;;
+				exit(1);
+		}
+		}else if(opt_non[i]=="--dec"){
 			if(mode==MODE_NON)
 				mode=MODE_DECRYPT;
-			else
-				ExitArgvError();
-		}else
+			else{
+				cerr<<"Please input --enc or --dec";
+				exit(1);
+			}
+		}else if(opt_non[i]=="--pad-zero")
+			padding_mode=AES::PADDING_ZERO;
+		else if(opt_non[i]=="--pad-pkcs5")
+			padding_mode=AES::PADDING_PKCS_5;
+		else
 			ExitArgvError();
 	}
 	if(mode==MODE_NON)
@@ -57,11 +66,22 @@ int main(int argc,char *argv[]){
 			password=it->second;
 	}
 	std::vector<std::string> input=opt.GetInput();
+	if(input.size()!=2)
+		ExitArgvError();
 
-	
+	if(password.empty()){
+		// debug(パスワードを入力)
+		password="testpass";
+	}
 
-	AES aes("1239658740123965874045924815",128);
-	aes.Encrypt("test_input.cpp","temp.enc",false,AES::PADDING_ZERO);
-	aes.Decrypt("temp.enc","ret.cpp",false,AES::PADDING_ZERO);
+	AES aes(password,key_length);
+	switch(mode){
+	case MODE_ENCRYPT:
+		aes.Encrypt(input[0],input[1],cbc,padding_mode);
+		break;
+	case MODE_DECRYPT:
+		aes.Decrypt(input[0],input[1],cbc,padding_mode);
+		break;
+	}
 	return 0;
 }
