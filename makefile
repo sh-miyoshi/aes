@@ -10,5 +10,5 @@ clean:
 	rm -f $(TARGET) $(OBJS)
 
 #ヘッダファイルの依存関係
-main.o: aes.h
+main.o: aes.h option.h
 aes.o: aes.h
