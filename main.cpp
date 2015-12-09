@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
+#include <conio.h>
+#include <stdio.h>
 #include "aes.h"
 #include "option.h"
 using namespace std;
@@ -20,6 +22,24 @@ enum Mode{
 	MODE_ENCRYPT,
 	MODE_DECRYPT
 };
+
+void InputPassword(std::string &ret){
+	char c;
+	while((c=getch())!='\n'&&c!='\r'){
+		if(c=='\b'){// BackSpace
+			if(!ret.empty()){
+				printf("\b \b");
+				ret.erase(ret.size()-1);
+			}
+		}else if(c<0x20||c>0x7e){// 2byte character in Shift-JIS
+			getch();
+		}else if(c!='\t'&&c!=0x1b){// Tab,Esc?
+			putchar('*');
+			ret+=c;
+		}
+	}
+	putchar('\n');
+}
 
 int main(int argc,char *argv[]){
 	Option opt;
@@ -70,8 +90,8 @@ int main(int argc,char *argv[]){
 		ExitArgvError();
 
 	if(password.empty()){
-		// debug(パスワードを入力)
-		password="testpass";
+		cout<<"Please Input Password"<<endl;
+		InputPassword(password);
 	}
 
 	AES aes(password,key_length);
