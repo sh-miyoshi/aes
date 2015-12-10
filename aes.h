@@ -4,6 +4,12 @@
 #include <wmmintrin.h>
 
 class AES{
+public:
+	enum PaddingMode{
+		PADDING_ZERO,
+		PADDING_PKCS_5
+	};
+private:
 	static const int MAX_NR=14;// max no of rounds
 	static const int FILE_READ_SIZE=4096;
 
@@ -18,12 +24,10 @@ class AES{
 	void AES_128_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key);
-public:
-	enum PaddingMode{
-		PADDING_ZERO,
-		PADDING_PKCS_5
-	};
 
+	int Padding(char *ret,PaddingMode mode,int val);
+	void RemovePadding(FILE *fp_out,const char *buf,PaddingMode mode,int end_point);
+public:
 	AES(std::string key,unsigned int key_bit_length,const char *init_vec=NULL);
 	~AES(){}
 

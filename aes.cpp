@@ -71,35 +71,20 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			memset(buf,0,sizeof(buf));
 			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
 			if(size==0){
-				if(!is_padding){
-					__m128i data;
-					switch(mode){
-					case PADDING_ZERO:
-						break;
-					case PADDING_PKCS_5:
-						for(int i=0;i<16;i++)
-							buf[i]=16;
+				if(!is_padding){// encrypt 128bit or 0bit
+					int n=Padding(buf,mode,16);
+					if(n>0){
+						__m128i data;
 						data=_mm_loadu_si128((__m128i *)buf);
 						data=Encrypt(data);
 						_mm_storeu_si128((__m128i *)(buf),data);
 						fwrite(buf,sizeof(char),16,fp_out);
-						break;
 					}
 				}
 				break;
 			}else if(size<FILE_READ_SIZE){
-				int val=0;
 				is_padding=true;
-				switch(mode){
-				case PADDING_ZERO:
-					break;
-				case PADDING_PKCS_5:
-					val=16-(size&15);
-					for(int i=size;i<size+val;i++)
-						buf[i]=val;
-					size+=val;
-					break;
-				}
+				size+=Padding(buf+size,mode,16-(size&15));
 			}
 			int max=(int)(size/16.0+0.95);// size>=1‚È‚çŒ…ã‚°‚µ‚ÄØ‚èÌ‚Ä
 			for(int i=0;i<max;i++){
@@ -182,6 +167,8 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 						}
 						break;
 					case PADDING_PKCS_5:
+						for(int i=0;i<(16-(int)ret[FILE_READ_SIZE-1]);i++)
+							fwrite(&ret[FILE_READ_SIZE-16+i],sizeof(char),1,fp_out);
 						break;
 					}
 					break;
@@ -321,4 +308,35 @@ void AES::AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key){
 	temp2=_mm_aeskeygenassist_si128(temp3,0x40);
 	AES_256_ASSIST_1(temp1,temp2);
 	key[14]=temp1;
+}
+
+int AES::Padding(char *ret,AES::PaddingMode mode,int val){
+	switch(mode){
+	case PADDING_ZERO:
+		return 0;
+	case PADDING_PKCS_5:
+		for(int i=0;i<val;i++)
+			ret[i]=val;
+		return val;
+	}
+	return 0;
+}
+
+void AES::RemovePadding(FILE *fp_out,const char *buf,PaddingMode mode,int end_point){
+	switch(mode){
+	case PADDING_ZERO:
+		for(int i=end_point-16;i<end_point;i++){
+			if(buf[i]==0)
+				return;
+			char c=buf[i];
+			fwrite(&c,sizeof(char),1,fp_out);
+		}
+		break;
+	case PADDING_PKCS_5:
+	for(int i=0;i<(16-(int)buf[end_point-1]);i++){
+			char c=buf[end_point-16+i];
+			fwrite(&c,sizeof(char),1,fp_out);
+		}
+		break;
+	}
 }
