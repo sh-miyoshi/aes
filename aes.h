@@ -11,7 +11,7 @@ public:
 	};
 private:
 	static const int MAX_NR=14;// max no of rounds
-	static const int FILE_READ_SIZE=4096;
+	static const int FILE_READ_SIZE=65536;
 
 	__m128i enc_key[MAX_NR+2],dec_key[MAX_NR+2];
 	unsigned int Nr;// number of rounds
@@ -33,6 +33,8 @@ public:
 
 	__m128i Encrypt(__m128i data);
 	__m128i Decrypt(__m128i data);
+	__m128i Encrypt_CBC(__m128i data,__m128i &vec);
+	__m128i Decrypt_CBC(__m128i data,__m128i &vec);
 
 	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
 	void Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);

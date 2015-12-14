@@ -50,136 +50,122 @@ __m128i AES::Decrypt(__m128i data){
 	return _mm_aesdeclast_si128(data,dec_key[Nr]);
 }
 
+__m128i AES::Encrypt_CBC(__m128i data,__m128i &vec){
+	__m128i ret=_mm_xor_si128(data,vec);
+	ret=Encrypt(ret);
+//	vec=_mm_xor_si128(data,ret);
+	return ret;
+}
+
+__m128i AES::Decrypt_CBC(__m128i data,__m128i &vec){
+	__m128i ret=Decrypt(data);
+	ret=_mm_xor_si128(ret,vec);
+//	vec=_mm_xor_si128(data,ret);
+	return ret;
+}
+
 void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
-	if(cbc){
-		std::cerr<<"cbc mode is not supported now\n";
+	FILE *fp_in=fopen(in_fname.c_str(),"rb");
+	FILE *fp_out=fopen(out_fname.c_str(),"wb");
+	if(!fp_in){
+		std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
 		exit(1);
-	}else{
-		FILE *fp_in=fopen(in_fname.c_str(),"rb");
-		FILE *fp_out=fopen(out_fname.c_str(),"wb");
-		if(!fp_in){
-			std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
-			exit(1);
-		}
-		if(!fp_out){
-			std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
-			exit(1);
-		}
-		char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
-		bool is_padding=false;
-		while(1){
-			memset(buf,0,sizeof(buf));
-			int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
-			if(size==0){
-				if(!is_padding){// encrypt 128bit or 0bit
-					int n=Padding(buf,mode,16);
-					if(n>0){
-						__m128i data;
-						data=_mm_loadu_si128((__m128i *)buf);
-						data=Encrypt(data);
-						_mm_storeu_si128((__m128i *)(buf),data);
-						fwrite(buf,sizeof(char),16,fp_out);
-					}
-				}
-				break;
-			}else if(size<FILE_READ_SIZE){
-				is_padding=true;
-				size+=Padding(buf+size,mode,16-(size&15));
-			}
-			int max=(int)(size/16.0+0.95);// size>=1なら桁上げして切り捨て
-			for(int i=0;i<max;i++){
-				char t[16]={0};
-				for(int j=0;j<16;j++)
-					t[j]=buf[i*16+j];
-				__m128i data=_mm_loadu_si128((__m128i *)t);
-				data=Encrypt(data);
-				_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
-			}
-			fwrite(ret,sizeof(char),max*16,fp_out);
-		}
-		fclose(fp_in);
-		fclose(fp_out);
 	}
+	if(!fp_out){
+		std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
+		exit(1);
+	}
+	char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+	bool is_padding=false;
+	__m128i cbc_vec=iv;
+	while(1){
+		memset(buf,0,sizeof(buf));
+		int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
+		if(size==0){
+			if(!is_padding){// encrypt 128bit or 0bit
+				int n=Padding(buf,mode,16);
+				if(n>0){
+					__m128i data;
+					data=_mm_loadu_si128((__m128i *)buf);
+					if(cbc)
+						data=Encrypt_CBC(data,cbc_vec);
+					else
+						data=Encrypt(data);
+					_mm_storeu_si128((__m128i *)(buf),data);
+					fwrite(buf,sizeof(char),16,fp_out);
+				}
+			}
+			break;
+		}else if(size<FILE_READ_SIZE){
+			is_padding=true;
+			size+=Padding(buf+size,mode,16-(size&15));
+		}
+		int max=(int)(size/16.0+0.95);// size>=1なら桁上げして切り捨て
+		for(int i=0;i<max;i++){
+			char t[16]={0};
+			for(int j=0;j<16;j++)
+				t[j]=buf[i*16+j];
+			__m128i data=_mm_loadu_si128((__m128i *)t);
+			data=Encrypt(data);
+			_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
+		}
+		fwrite(ret,sizeof(char),max*16,fp_out);
+	}
+	fclose(fp_in);
+	fclose(fp_out);
 }
 
 void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
-	if(cbc){
-		std::cerr<<"cbc mode is not supported now\n";
+	FILE *fp_in=fopen(in_fname.c_str(),"rb");
+	FILE *fp_out=fopen(out_fname.c_str(),"wb");
+	if(!fp_in){
+		std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
 		exit(1);
-	}else{
-		FILE *fp_in=fopen(in_fname.c_str(),"rb");
-		FILE *fp_out=fopen(out_fname.c_str(),"wb");
-		if(!fp_in){
-			std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
-			exit(1);
-		}
-		if(!fp_out){
-			std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
-			exit(1);
-		}
-		char buf[2][FILE_READ_SIZE],dec[FILE_READ_SIZE],ret[FILE_READ_SIZE];
-		memset(buf[0],0,sizeof(buf[0]));
-		int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
-		if(size==0)
-			return;
-		while(1){
-			memcpy(buf[1],buf[0],size);
-			for(int i=0;i<size/16;i++){
-				char t[16]={0};
-				for(int j=0;j<16;j++)
-					t[j]=buf[1][i*16+j];
-				__m128i data=_mm_loadu_si128((__m128i *)t);
-				data=Decrypt(data);
-				_mm_storeu_si128((__m128i *)(dec+(i*16)),data);
-			}
-			memcpy(ret,dec,size);
-			if(size<FILE_READ_SIZE){
-				fwrite(ret,sizeof(char),size-16,fp_out);
-				switch(mode){// remove padding
-				case PADDING_ZERO:
-					for(int i=size-16;i<size;i++){
-						if(ret[i]!=0)
-							fwrite(&ret[i],sizeof(char),1,fp_out);
-						else
-							break;
-					}
-					break;
-				case PADDING_PKCS_5:
-					for(int i=0;i<(16-(int)ret[size-1]);i++)
-						fwrite(&ret[size-16+i],sizeof(char),1,fp_out);
-					break;
-				}
-				break;
-			}else{
-				memcpy(buf[1],buf[0],FILE_READ_SIZE);
-				memset(buf[0],0,sizeof(buf[0]));
-				int s2=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
-				if(s2==0){
-					fwrite(ret,sizeof(char),FILE_READ_SIZE-16,fp_out);
-					// buf[1]最後のバイト列はpaddingの可能性
-					switch(mode){
-					case PADDING_ZERO:
-						for(int i=FILE_READ_SIZE-16;i<FILE_READ_SIZE;i++){
-							if(ret[i]!=0)
-								fwrite(&ret[i],sizeof(char),1,fp_out);
-							else
-								break;
-						}
-						break;
-					case PADDING_PKCS_5:
-						for(int i=0;i<(16-(int)ret[FILE_READ_SIZE-1]);i++)
-							fwrite(&ret[FILE_READ_SIZE-16+i],sizeof(char),1,fp_out);
-						break;
-					}
-					break;
-				}
-				size=s2;
-				fwrite(ret,sizeof(char),FILE_READ_SIZE,fp_out);
-			}
-		}
-		fclose(fp_in);
-		fclose(fp_out);
 	}
+	if(!fp_out){
+		std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
+		exit(1);
+	}
+	char buf[2][FILE_READ_SIZE],dec[FILE_READ_SIZE],ret[FILE_READ_SIZE];
+	memset(buf[0],0,sizeof(buf[0]));
+	int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
+	if(size==0)
+		return;
+	__m128i cbc_vec=iv;
+	while(1){
+		memcpy(buf[1],buf[0],size);
+		for(int i=0;i<size/16;i++){
+			char t[16]={0};
+			for(int j=0;j<16;j++)
+				t[j]=buf[1][i*16+j];
+			__m128i data=_mm_loadu_si128((__m128i *)t);
+			if(cbc)
+				data=Decrypt_CBC(data,cbc_vec);
+			else
+				data=Decrypt(data);
+			_mm_storeu_si128((__m128i *)(dec+(i*16)),data);
+		}
+		memcpy(ret,dec,size);
+		if(size<FILE_READ_SIZE){
+			fwrite(ret,sizeof(char),size-16,fp_out);
+			RemovePadding(fp_out,ret,mode,size);
+			break;
+		}else{
+			memcpy(buf[1],buf[0],FILE_READ_SIZE);
+			memset(buf[0],0,sizeof(buf[0]));
+			int s2=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
+			if(s2==0){
+				fwrite(ret,sizeof(char),FILE_READ_SIZE-16,fp_out);
+				// buf[1]最後のバイト列はpaddingの可能性
+				RemovePadding(fp_out,ret,mode,FILE_READ_SIZE);
+				break;
+			}
+			size=s2;
+			fwrite(ret,sizeof(char),FILE_READ_SIZE,fp_out);
+		}
+	}
+	fclose(fp_in);
+	fclose(fp_out);
 }
 
 __m128i AES::AES_128_ASSIST(__m128i temp1,__m128i temp2){
@@ -333,7 +319,7 @@ void AES::RemovePadding(FILE *fp_out,const char *buf,PaddingMode mode,int end_po
 		}
 		break;
 	case PADDING_PKCS_5:
-	for(int i=0;i<(16-(int)buf[end_point-1]);i++){
+		for(int i=0;i<(16-(int)buf[end_point-1]);i++){
 			char c=buf[end_point-16+i];
 			fwrite(&c,sizeof(char),1,fp_out);
 		}
