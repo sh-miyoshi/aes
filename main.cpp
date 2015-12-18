@@ -94,10 +94,7 @@ int main(int argc,char *argv[]){
 		InputPassword(password);
 	}
 
-	char iv[16];
-	for(int i=0;i<16;i++)
-		iv[i]=i;
-	AES aes(password,key_length,iv);
+	AES aes(password,key_length);
 	switch(mode){
 	case MODE_ENCRYPT:
 		aes.Encrypt(input[0],input[1],cbc,padding_mode);

@@ -53,14 +53,14 @@ __m128i AES::Decrypt(__m128i data){
 __m128i AES::Encrypt_CBC(__m128i data,__m128i &vec){
 	__m128i ret=_mm_xor_si128(data,vec);
 	ret=Encrypt(ret);
-//	vec=_mm_xor_si128(data,ret);
+	vec=_mm_xor_si128(data,ret);
 	return ret;
 }
 
 __m128i AES::Decrypt_CBC(__m128i data,__m128i &vec){
 	__m128i ret=Decrypt(data);
 	ret=_mm_xor_si128(ret,vec);
-//	vec=_mm_xor_si128(data,ret);
+	vec=_mm_xor_si128(data,ret);
 	return ret;
 }
 
@@ -106,7 +106,10 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			for(int j=0;j<16;j++)
 				t[j]=buf[i*16+j];
 			__m128i data=_mm_loadu_si128((__m128i *)t);
-			data=Encrypt(data);
+			if(cbc)
+				data=Encrypt_CBC(data,cbc_vec);
+			else
+				data=Encrypt(data);
 			_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
 		}
 		fwrite(ret,sizeof(char),max*16,fp_out);
