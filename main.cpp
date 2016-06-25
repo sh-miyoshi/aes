@@ -56,9 +56,9 @@ int main(int argc,char *argv[]){
 			if(mode==MODE_NON)
 				mode=MODE_ENCRYPT;
 			else{
-				cerr<<"Please input --enc or --dec"<<endl;;
+				cerr<<"Please input --enc or --dec"<<endl;
 				exit(1);
-		}
+			}
 		}else if(opt_non[i]=="--dec"){
 			if(mode==MODE_NON)
 				mode=MODE_DECRYPT;
