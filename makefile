@@ -1,5 +1,9 @@
 CXX = g++
-TARGET = aes.exe
+ifeq ($(OS),Windows_NT)
+  TARGET = aes.exe
+else
+  TARGET = aes
+endif
 CXXFLAGS = -O2 -maes -mpclmul
 SRCS = main.cpp aes.cpp
 OBJS := $(SRCS:.cpp=.o)
@@ -9,6 +13,6 @@ $(TARGET): $(OBJS)
 clean:
 	rm -f $(TARGET) $(OBJS)
 
-#ヘッダファイルの依存関係
+# Header Dependency
 main.o: aes.h option.h
 aes.o: aes.h

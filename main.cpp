@@ -1,10 +1,20 @@
+#ifndef _WINDOWS
+#if defined(_WIN64) || defined(_WIN32) || defined(__MINGW32__) || defined(__MINGW64__)
+#define _WINDOWS
+#endif
+#endif
+
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
-#include <conio.h>
 #include <stdio.h>
 #include "aes.h"
 #include "option.h"
+
+#ifdef _WINDOWS
+#include <conio.h>
+#endif
+
 using namespace std;
 
 void ExitArgvError(){
@@ -24,6 +34,7 @@ enum Mode{
 };
 
 void InputPassword(std::string &ret){
+#ifdef _WINDOWS
 	char c;
 	while((c=getch())!='\n'&&c!='\r'){
 		if(c=='\b'){// BackSpace
@@ -39,6 +50,10 @@ void InputPassword(std::string &ret){
 		}
 	}
 	putchar('\n');
+#else
+	puts("Linux version is not implemented now.");
+	exit(1);
+#endif
 }
 
 int main(int argc,char *argv[]){
