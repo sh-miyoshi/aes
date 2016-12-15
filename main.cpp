@@ -16,6 +16,8 @@
 
 #ifdef _WINDOWS
 #include <conio.h>
+#else
+#include <unistd.h>
 #endif
 
 using namespace std;
