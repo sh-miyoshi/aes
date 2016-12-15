@@ -10,6 +10,8 @@ AES::AES(std::string key,unsigned int key_bit_length,const char *init_vec){
 	for(int i=0;i<kl_byte;i++)
 		uk[i]=key[i%key.size()];
 	Nr=6+(kl_byte/4);
+
+#ifdef USE_AES_NI
 	switch(key_bit_length){
 	case 128:
 		AES_128_Key_Expansion(enc_key,uk);
@@ -34,8 +36,13 @@ AES::AES(std::string key,unsigned int key_bit_length,const char *init_vec){
 		this->iv=_mm_setzero_si128();
 	else
 		this->iv=_mm_loadu_si128((__m128i *)init_vec);
+#else
+	puts("–¢ŽÀ‘•");
+	exit(1);
+#endif
 }
 
+#ifdef USE_AES_NI
 __m128i AES::Encrypt(__m128i data){
 	data=_mm_xor_si128(data,enc_key[0]);
 	for(int i=1;i<Nr;i++)
@@ -63,6 +70,8 @@ __m128i AES::Decrypt_CBC(__m128i data,__m128i &vec){
 	vec=_mm_xor_si128(data,ret);
 	return ret;
 }
+#else
+#endif
 
 void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
 	FILE *fp_in=fopen(in_fname.c_str(),"rb");
@@ -77,7 +86,12 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 	}
 	char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
 	bool is_padding=false;
+#ifdef USE_AES_NI
 	__m128i cbc_vec=iv;
+#else
+	puts("–¢ŽÀ‘•");
+	exit(1);
+#endif
 	while(1){
 		memset(buf,0,sizeof(buf));
 		int size=fread(buf,sizeof(char),FILE_READ_SIZE,fp_in);
@@ -85,6 +99,7 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			if(!is_padding){// encrypt 128bit or 0bit
 				int n=Padding(buf,mode,16);
 				if(n>0){
+#ifdef USE_AES_NI
 					__m128i data;
 					data=_mm_loadu_si128((__m128i *)buf);
 					if(cbc)
@@ -92,6 +107,10 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 					else
 						data=Encrypt(data);
 					_mm_storeu_si128((__m128i *)(buf),data);
+#else
+					puts("–¢ŽÀ‘•");
+					exit(1);
+#endif
 					fwrite(buf,sizeof(char),16,fp_out);
 				}
 			}
@@ -105,12 +124,17 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			char t[16]={0};
 			for(int j=0;j<16;j++)
 				t[j]=buf[i*16+j];
+#ifdef USE_AES_NI
 			__m128i data=_mm_loadu_si128((__m128i *)t);
 			if(cbc)
 				data=Encrypt_CBC(data,cbc_vec);
 			else
 				data=Encrypt(data);
 			_mm_storeu_si128((__m128i *)(ret+(i*16)),data);
+#else
+			puts("–¢ŽÀ‘•");
+			exit(1);
+#endif
 		}
 		fwrite(ret,sizeof(char),max*16,fp_out);
 	}
@@ -134,12 +158,18 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 	int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
 	if(size==0)
 		return;
+#ifdef USE_AES_NI
 	__m128i cbc_vec=iv;
+#else
+	puts("–¢ŽÀ‘•");
+	exit(1);
+#endif
 	while(1){
 		memcpy(buf[1],buf[0],size);
 		for(int i=0;i<size/16;i++){
 			char t[16]={0};
-			for(int j=0;j<16;j++)
+#ifdef USE_AES_NI
+				for(int j=0;j<16;j++)
 				t[j]=buf[1][i*16+j];
 			__m128i data=_mm_loadu_si128((__m128i *)t);
 			if(cbc)
@@ -147,6 +177,10 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 			else
 				data=Decrypt(data);
 			_mm_storeu_si128((__m128i *)(dec+(i*16)),data);
+#else
+			puts("–¢ŽÀ‘•");
+			exit(1);
+#endif
 		}
 		memcpy(ret,dec,size);
 		if(size<FILE_READ_SIZE){
@@ -171,6 +205,7 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 	fclose(fp_out);
 }
 
+#ifdef USE_AES_NI
 __m128i AES::AES_128_ASSIST(__m128i temp1,__m128i temp2){
 	__m128i temp3;
 	temp2=_mm_shuffle_epi32(temp2,0xff);
@@ -298,6 +333,8 @@ void AES::AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key){
 	AES_256_ASSIST_1(temp1,temp2);
 	key[14]=temp1;
 }
+#else
+#endif
 
 int AES::Padding(char *ret,AES::PaddingMode mode,int val){
 	switch(mode){

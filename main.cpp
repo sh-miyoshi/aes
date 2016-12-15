@@ -4,10 +4,13 @@
 #endif
 #endif
 
+#define TIME_MEASUREMENT
+
 #include <iostream>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include "aes.h"
 #include "option.h"
 
@@ -51,8 +54,7 @@ void InputPassword(std::string &ret){
 	}
 	putchar('\n');
 #else
-	puts("Linux version is not implemented now.");
-	exit(1);
+	ret=getpass(NULL);
 #endif
 }
 
@@ -109,6 +111,9 @@ int main(int argc,char *argv[]){
 		InputPassword(password);
 	}
 
+#ifdef TIME_MEASUREMENT
+	clock_t start_time=clock();
+#endif
 	AES aes(password,key_length);
 	switch(mode){
 	case MODE_ENCRYPT:
@@ -118,5 +123,9 @@ int main(int argc,char *argv[]){
 		aes.Decrypt(input[0],input[1],cbc,padding_mode);
 		break;
 	}
+#ifdef TIME_MEASUREMENT
+	clock_t end_time=clock();
+	printf("%.2f[sec]\n",(double)(end_time-start_time)/CLOCKS_PER_SEC);
+#endif
 	return 0;
 }

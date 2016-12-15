@@ -3,6 +3,8 @@
 #include <string>
 #include <wmmintrin.h>
 
+#define USE_AES_NI
+
 class AES{
 public:
 	enum PaddingMode{
@@ -13,8 +15,9 @@ private:
 	static const int MAX_NR=14;// max no of rounds
 	static const int FILE_READ_SIZE=65536;
 
-	__m128i enc_key[MAX_NR+2],dec_key[MAX_NR+2];
 	unsigned int Nr;// number of rounds
+#ifdef USE_AES_NI
+	__m128i enc_key[MAX_NR+2],dec_key[MAX_NR+2];
 	__m128i iv;// initialization vector
 
 	__m128i AES_128_ASSIST(__m128i temp1,__m128i temp2);
@@ -24,6 +27,9 @@ private:
 	void AES_128_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key);
+#else
+	char iv[16];// initialization vector
+#endif
 
 	int Padding(char *ret,PaddingMode mode,int val);
 	void RemovePadding(FILE *fp_out,const char *buf,PaddingMode mode,int end_point);
@@ -31,10 +37,13 @@ public:
 	AES(std::string key,unsigned int key_bit_length,const char *init_vec=NULL);
 	~AES(){}
 
+#ifdef USE_AES_NI
 	__m128i Encrypt(__m128i data);
 	__m128i Decrypt(__m128i data);
 	__m128i Encrypt_CBC(__m128i data,__m128i &vec);
 	__m128i Decrypt_CBC(__m128i data,__m128i &vec);
+#else
+#endif
 
 	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
 	void Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
