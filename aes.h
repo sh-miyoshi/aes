@@ -3,7 +3,7 @@
 #include <string>
 #include <wmmintrin.h>
 
-#define USE_AES_NI
+//#define USE_AES_NI
 
 class AES{
 public:
@@ -28,7 +28,21 @@ private:
 	void AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key);
 #else
-	char iv[16];// initialization vector
+	unsigned char iv[16];// initialization vector
+	unsigned char roundKey[16*(MAX_NR+1)];
+
+	unsigned char ExtMul(unsigned char data,int n);
+	void SubWord(unsigned char *w);
+	void RotWord(unsigned char *w);
+	void KeyExpansion(const unsigned char *userKey,int wordKeyLength);
+
+	void SubBytes(unsigned char *data);
+	void ShiftRows(unsigned char *data);
+	void MixColumns(unsigned char *data);
+	void InvSubBytes(unsigned char *data);
+	void InvShiftRows(unsigned char *data);
+	void InvMixColumns(unsigned char *data);
+	void AddRoundKey(unsigned char *data,int n);
 #endif
 
 	int Padding(char *ret,PaddingMode mode,int val);
@@ -43,6 +57,10 @@ public:
 	__m128i Encrypt_CBC(__m128i data,__m128i &vec);
 	__m128i Decrypt_CBC(__m128i data,__m128i &vec);
 #else
+	void Encrypt(unsigned char *data);
+	void Decrypt(unsigned char *data);
+	void Encrypt_CBC(unsigned char *data,unsigned char *vec);
+	void Decrypt_CBC(unsigned char *data,unsigned char *vec);
 #endif
 
 	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);

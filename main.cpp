@@ -56,7 +56,7 @@ void InputPassword(std::string &ret){
 	}
 	putchar('\n');
 #else
-	ret=getpass(NULL);
+	ret=getpass("Password: ");
 #endif
 }
 
@@ -111,6 +111,11 @@ int main(int argc,char *argv[]){
 	if(password.empty()){
 		cout<<"Please Input Password"<<endl;
 		InputPassword(password);
+	}
+
+	if(password.empty()){
+		cout<<"This system is not allow [encryption|decryption] with empty password."<<endl;
+		return 0;
 	}
 
 #ifdef TIME_MEASUREMENT
