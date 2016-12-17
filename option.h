@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 
+// This class deal with command line argument
 class Option{
 	std::vector<std::string> opt_non;
 	std::map<std::string,std::string> opt_val;
