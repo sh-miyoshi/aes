@@ -153,7 +153,7 @@ void AES::Encrypt_CBC(unsigned char *data,unsigned char *vec){
 	}
 	Encrypt(data);
 	for(int i=0;i<16;i++)
-		vec[i]=data[i]|temp[i];
+		vec[i]=data[i]^temp[i];
 }
 
 void AES::Decrypt_CBC(unsigned char *data,unsigned char *vec){
@@ -163,7 +163,7 @@ void AES::Decrypt_CBC(unsigned char *data,unsigned char *vec){
 	Decrypt(data);
 	for(int i=0;i<16;i++){
 		data[i]|=vec[i];
-		vec[i]=data[i]|temp[i];
+		vec[i]=data[i]^temp[i];
 	}
 }
 
@@ -448,17 +448,31 @@ void AES::SubBytes(unsigned char *data){
 }
 
 void AES::ShiftRows(unsigned char *data){
-	// —v‰ü‘P
-	unsigned char buf[16];
-	memcpy(buf,data,sizeof(buf));
-	for(int i=1;i<4;i++){
-		for(int j=0;j<4;j++)
-			data[(i<<2)+j]=buf[(i<<2)+(j+i)&3];
-	}
+	unsigned char temp=data[4];
+
+	// line 1
+	data[4]=data[5];
+	data[5]=data[6];
+	data[6]=data[7];
+	data[7]=temp;
+
+	// line 2
+	temp=data[8];
+	data[8]=data[10];
+	data[10]=temp;
+	temp=data[9];
+	data[9]=data[11];
+	data[11]=temp;
+
+	// line 3
+	temp=data[15];
+	data[15]=data[14];
+	data[14]=data[13];
+	data[13]=data[12];
+	data[12]=temp;
 }
 
 void AES::MixColumns(unsigned char *data){
-	// —v‰ü‘P
 	unsigned char buf[8];
 	for(int x=0;x<4;x++){
 		for(int y=0;y<4;y++)
@@ -483,10 +497,6 @@ void AES::MixColumns(unsigned char *data){
 		ExtMul(buf[6],buf[2],1);
 		ExtMul(buf[7],buf[3],2);
 		data[x+12]=buf[4]^buf[5]^buf[6]^buf[7];
-//		data[x+ 0]=ExtMul(buf[0],2)^ExtMul(buf[1],3)^ExtMul(buf[2],1)^ExtMul(buf[3],1);
-//		data[x+ 4]=ExtMul(buf[0],1)^ExtMul(buf[1],2)^ExtMul(buf[2],3)^ExtMul(buf[3],1);
-//		data[x+ 8]=ExtMul(buf[0],1)^ExtMul(buf[1],1)^ExtMul(buf[2],2)^ExtMul(buf[3],3);
-//		data[x+12]=ExtMul(buf[0],3)^ExtMul(buf[1],1)^ExtMul(buf[2],1)^ExtMul(buf[3],2);
 	}
 }
 
@@ -530,11 +540,6 @@ void AES::InvMixColumns(unsigned char *data){
 		ExtMul(buf[6],buf[2],9);
 		ExtMul(buf[7],buf[3],14);
 		data[x+12]=buf[4]^buf[5]^buf[6]^buf[7];
-
-//		data[x+ 0]=ExtMul(buf[0],14)^ExtMul(buf[1],11)^ExtMul(buf[2],13)^ExtMul(buf[3], 9);
-//		data[x+ 4]=ExtMul(buf[0], 9)^ExtMul(buf[1],14)^ExtMul(buf[2],11)^ExtMul(buf[3],13);
-//		data[x+ 8]=ExtMul(buf[0],13)^ExtMul(buf[1], 9)^ExtMul(buf[2],14)^ExtMul(buf[3],11);
-//		data[x+12]=ExtMul(buf[0],11)^ExtMul(buf[1],13)^ExtMul(buf[2], 9)^ExtMul(buf[3],14);
 	}
 }
 

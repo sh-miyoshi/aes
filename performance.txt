@@ -10,3 +10,11 @@
 		135.77[sec]
 		135.76[sec]
 		135.75[sec]
+
+		43.95[sec](3.1”{‚Ì‚‘¬‰», 32”{’x‚¢)
+
+perfƒŒƒ|[ƒg
+	MixColumns:	43.13%
+	Encrypt:	23.60%
+	ShiftRows:	14.28%
+	copy_user_generic_unrolled(kernel):	13.39%

@@ -36,13 +36,13 @@ private:
 	void RotWord(unsigned char *w);
 	void KeyExpansion(const unsigned char *userKey,int wordKeyLength);
 
-	void SubBytes(unsigned char *data);
-	void ShiftRows(unsigned char *data);
-	void MixColumns(unsigned char *data);
-	void InvSubBytes(unsigned char *data);
-	void InvShiftRows(unsigned char *data);
-	void InvMixColumns(unsigned char *data);
-	void AddRoundKey(unsigned char *data,int n);
+	inline void SubBytes(unsigned char *data);
+	inline void ShiftRows(unsigned char *data);
+	inline void MixColumns(unsigned char *data);
+	inline void InvSubBytes(unsigned char *data);
+	inline void InvShiftRows(unsigned char *data);
+	inline void InvMixColumns(unsigned char *data);
+	inline void AddRoundKey(unsigned char *data,int n);
 #endif
 
 	int Padding(char *ret,PaddingMode mode,int val);
