@@ -31,7 +31,7 @@ private:
 	unsigned char iv[16];// initialization vector
 	unsigned char roundKey[16*(MAX_NR+1)];
 
-	unsigned char ExtMul(unsigned char data,int n);
+	inline void ExtMul(unsigned char &x,unsigned char data,int n);
 	void SubWord(unsigned char *w);
 	void RotWord(unsigned char *w);
 	void KeyExpansion(const unsigned char *userKey,int wordKeyLength);

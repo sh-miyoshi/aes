@@ -448,6 +448,7 @@ void AES::SubBytes(unsigned char *data){
 }
 
 void AES::ShiftRows(unsigned char *data){
+	// —v‰ü‘P
 	unsigned char buf[16];
 	memcpy(buf,data,sizeof(buf));
 	for(int i=1;i<4;i++){
@@ -457,15 +458,35 @@ void AES::ShiftRows(unsigned char *data){
 }
 
 void AES::MixColumns(unsigned char *data){
-	unsigned char x;
+	// —v‰ü‘P
+	unsigned char buf[8];
 	for(int x=0;x<4;x++){
-		unsigned char buf[4];
 		for(int y=0;y<4;y++)
 			buf[y]=data[(y<<2)+x];
-		data[x+ 0]=ExtMul(buf[0],2)^ExtMul(buf[1],3)^ExtMul(buf[2],1)^ExtMul(buf[3],1);
-		data[x+ 4]=ExtMul(buf[0],1)^ExtMul(buf[1],2)^ExtMul(buf[2],3)^ExtMul(buf[3],1);
-		data[x+ 8]=ExtMul(buf[0],1)^ExtMul(buf[1],1)^ExtMul(buf[2],2)^ExtMul(buf[3],3);
-		data[x+12]=ExtMul(buf[0],3)^ExtMul(buf[1],1)^ExtMul(buf[2],1)^ExtMul(buf[3],2);
+		ExtMul(buf[4],buf[0],2);
+		ExtMul(buf[5],buf[1],3);
+		ExtMul(buf[6],buf[2],1);
+		ExtMul(buf[7],buf[3],1);
+		data[x+0]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],1);
+		ExtMul(buf[5],buf[1],2);
+		ExtMul(buf[6],buf[2],3);
+		ExtMul(buf[7],buf[3],1);
+		data[x+4]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],1);
+		ExtMul(buf[5],buf[1],1);
+		ExtMul(buf[6],buf[2],2);
+		ExtMul(buf[7],buf[3],3);
+		data[x+8]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],3);
+		ExtMul(buf[5],buf[1],1);
+		ExtMul(buf[6],buf[2],1);
+		ExtMul(buf[7],buf[3],2);
+		data[x+12]=buf[4]^buf[5]^buf[6]^buf[7];
+//		data[x+ 0]=ExtMul(buf[0],2)^ExtMul(buf[1],3)^ExtMul(buf[2],1)^ExtMul(buf[3],1);
+//		data[x+ 4]=ExtMul(buf[0],1)^ExtMul(buf[1],2)^ExtMul(buf[2],3)^ExtMul(buf[3],1);
+//		data[x+ 8]=ExtMul(buf[0],1)^ExtMul(buf[1],1)^ExtMul(buf[2],2)^ExtMul(buf[3],3);
+//		data[x+12]=ExtMul(buf[0],3)^ExtMul(buf[1],1)^ExtMul(buf[2],1)^ExtMul(buf[3],2);
 	}
 }
 
@@ -485,14 +506,35 @@ void AES::InvShiftRows(unsigned char *data){
 
 void AES::InvMixColumns(unsigned char *data){
 	unsigned char x;
+	unsigned char buf[8];
 	for(int x=0;x<4;x++){
-		unsigned char buf[4];
 		for(int y=0;y<4;y++)
 			buf[y]=data[y*4+x];
-		data[x+ 0]=ExtMul(buf[0],14)^ExtMul(buf[1],11)^ExtMul(buf[2],13)^ExtMul(buf[3], 9);
-		data[x+ 4]=ExtMul(buf[0], 9)^ExtMul(buf[1],14)^ExtMul(buf[2],11)^ExtMul(buf[3],13);
-		data[x+ 8]=ExtMul(buf[0],13)^ExtMul(buf[1], 9)^ExtMul(buf[2],14)^ExtMul(buf[3],11);
-		data[x+12]=ExtMul(buf[0],11)^ExtMul(buf[1],13)^ExtMul(buf[2], 9)^ExtMul(buf[3],14);
+		ExtMul(buf[4],buf[0],14);
+		ExtMul(buf[5],buf[1],11);
+		ExtMul(buf[6],buf[2],13);
+		ExtMul(buf[7],buf[3],9);
+		data[x+0]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],9);
+		ExtMul(buf[5],buf[1],14);
+		ExtMul(buf[6],buf[2],11);
+		ExtMul(buf[7],buf[3],13);
+		data[x+4]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],13);
+		ExtMul(buf[5],buf[1],9);
+		ExtMul(buf[6],buf[2],14);
+		ExtMul(buf[7],buf[3],11);
+		data[x+8]=buf[4]^buf[5]^buf[6]^buf[7];
+		ExtMul(buf[4],buf[0],11);
+		ExtMul(buf[5],buf[1],13);
+		ExtMul(buf[6],buf[2],9);
+		ExtMul(buf[7],buf[3],14);
+		data[x+12]=buf[4]^buf[5]^buf[6]^buf[7];
+
+//		data[x+ 0]=ExtMul(buf[0],14)^ExtMul(buf[1],11)^ExtMul(buf[2],13)^ExtMul(buf[3], 9);
+//		data[x+ 4]=ExtMul(buf[0], 9)^ExtMul(buf[1],14)^ExtMul(buf[2],11)^ExtMul(buf[3],13);
+//		data[x+ 8]=ExtMul(buf[0],13)^ExtMul(buf[1], 9)^ExtMul(buf[2],14)^ExtMul(buf[3],11);
+//		data[x+12]=ExtMul(buf[0],11)^ExtMul(buf[1],13)^ExtMul(buf[2], 9)^ExtMul(buf[3],14);
 	}
 }
 
@@ -501,16 +543,28 @@ void AES::AddRoundKey(unsigned char *data,int n){
 		data[i]^=roundKey[(n<<4)+i];
 }
 
-unsigned char AES::ExtMul(unsigned char data,int n){
-	unsigned x=0;
-	for(int i=8;i>0;i>>=1){
-		x<<=1;
-		if(x&0x100)
-			x=(x^0x1b)&0xff;
-		if(n&i)
-			x^=data;
-	}
-	return (unsigned char)x;
+void AES::ExtMul(unsigned char &x,unsigned char data,int n){
+	x=0;
+	if(n&8)
+		x=data;
+	bool flag=x&0x80;
+	x<<=1;
+	if(flag)
+		x^=0x1b;
+	if(n&4)
+		x^=data;
+	flag=x&0x80;
+	x<<=1;
+	if(flag)
+		x^=0x1b;
+	if(n&2)
+		x^=data;
+	flag=x&0x80;
+	x<<=1;
+	if(flag)
+		x^=0x1b;
+	if(n&1)
+		x^=data;
 }
 
 void AES::SubWord(unsigned char *w){
