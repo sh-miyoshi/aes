@@ -4,7 +4,7 @@ ifeq ($(OS),Windows_NT)
 else
   TARGET = aes
 endif
-CXXFLAGS = -O2 -maes -mpclmul
+CXXFLAGS = -O3 -maes -mpclmul
 SRCS = main.cpp aes.cpp
 OBJS := $(SRCS:.cpp=.o)
 

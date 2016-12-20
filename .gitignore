@@ -1,2 +1,5 @@
 debug/*
 *.o
+aes
+aes.exe
+todo.txt

@@ -473,6 +473,7 @@ void AES::ShiftRows(unsigned char *data){
 }
 
 void AES::MixColumns(unsigned char *data){
+	// —v‰ü‘P
 	unsigned char buf[8];
 	for(int x=0;x<4;x++){
 		for(int y=0;y<4;y++)
@@ -506,6 +507,7 @@ void AES::InvSubBytes(unsigned char *data){
 }
 
 void AES::InvShiftRows(unsigned char *data){
+	// —v‰ü‘P
 	unsigned char buf[16];
 	memcpy(buf,data,sizeof(buf));
 	for(int i=1;i<4;i++){
@@ -515,6 +517,7 @@ void AES::InvShiftRows(unsigned char *data){
 }
 
 void AES::InvMixColumns(unsigned char *data){
+	// —v‰ü‘P
 	unsigned char x;
 	unsigned char buf[8];
 	for(int x=0;x<4;x++){

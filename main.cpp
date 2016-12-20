@@ -22,16 +22,6 @@
 
 using namespace std;
 
-void ExitArgvError(){
-	// Show help message
-	cerr<<"Usage: aes.exe (--enc or --dec) [options] input_file output_file"<<endl;
-	cerr<<"  --cbc [if you want to encrypt(or decrypt) with cbc mode]"<<endl;
-	cerr<<"  --pad-zero or --pad-pkcs5 [select padding type(zero or PKCS#5, default is PKCS#5)]"<<endl;
-	cerr<<"  -l \"key_length\" [key bit length(128,192,256)]"<<endl;
-	cerr<<"  -p \"password\""<<endl;
-	exit(1);
-}
-
 enum Mode{
 	MODE_NON,
 	MODE_ENCRYPT,
@@ -62,14 +52,26 @@ void InputPassword(std::string &ret){
 
 int main(int argc,char *argv[]){
 	Option opt;
-	if(!opt.Set(argc,argv))
-		ExitArgvError();
+	opt.AddHelpMessage("Usage: aes.exe (--enc or --dec) [options] input_file output_file");
+	opt.AddDefine("--cbc","","","if you want to encrypt(or decrypt) with cbc mode");
+	opt.AddDefine("--pad-zero","--pad-pkcs5","","select padding type(zero or PKCS#5, default is PKCS#5)");
+	opt.AddDefine("-l","--keylen","\"key_length\"","key bit length(128,192,256)");
+	opt.AddDefine("-p","--password","\"password\"","set password");
+	opt.AddDefine("-?","--help","","show this help message");
+	
+	if(!opt.SetArguments(argc,argv)){
+		opt.ShowHelpMessage();
+		return 1;
+	}
 	std::vector<std::string> opt_non=opt.GetOptionNon();
 	bool cbc=false;
 	Mode mode=MODE_NON;
 	AES::PaddingMode padding_mode=AES::PADDING_PKCS_5;
 	for(int i=0;i<opt_non.size();i++){
-		if(opt_non[i]=="--cbc")
+		if(opt_non[i]=="--help"||opt_non[i]=="-?"){
+			opt.ShowHelpMessage();
+			return 0;
+		}else if(opt_non[i]=="--cbc")
 			cbc=true;
 		else if(opt_non[i]=="--enc"){
 			if(mode==MODE_NON)
@@ -89,24 +91,30 @@ int main(int argc,char *argv[]){
 			padding_mode=AES::PADDING_ZERO;
 		else if(opt_non[i]=="--pad-pkcs5")
 			padding_mode=AES::PADDING_PKCS_5;
-		else
-			ExitArgvError();
+		else{
+			opt.ShowHelpMessage();
+			return 1;
+		}
 	}
-	if(mode==MODE_NON)
-		ExitArgvError();
+	if(mode==MODE_NON){
+		opt.ShowHelpMessage();
+		return 1;
+	}
 
 	int key_length=128;
 	std::string password;
 	std::map<std::string,std::string> opt_val=opt.GetOptionValue();
 	for(map<string,string>::iterator it=opt_val.begin();it!=opt_val.end();it++){
-		if(it->first=="-l")
+		if(it->first=="-l"||it->first=="--keylen")
 			key_length=atoi(it->second.c_str());
-		else if(it->first=="-p")
+		else if(it->first=="-p"||it->first=="--password")
 			password=it->second;
 	}
 	std::vector<std::string> input=opt.GetInput();
-	if(input.size()!=2)
-		ExitArgvError();
+	if(input.size()!=2){
+		opt.ShowHelpMessage();
+		return 1;
+	}
 
 	if(password.empty()){
 		cout<<"Please Input Password"<<endl;
