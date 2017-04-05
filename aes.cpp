@@ -474,6 +474,7 @@ void AES::ShiftRows(unsigned char *data){
 
 void AES::MixColumns(unsigned char *data){
 	// —v‰ü‘P
+	// SIMD‚Ý‚½‚¢‚ÈŠ´‚¶‚Å
 	unsigned char buf[8];
 	for(int x=0;x<4;x++){
 		for(int y=0;y<4;y++)
