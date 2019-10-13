@@ -13,6 +13,6 @@ $(TARGET): $(OBJS)
 clean:
 	rm -f $(TARGET) $(OBJS)
 
-# Header Dependency
+# Header Dependencies
 main.o: aes.h option.h
 aes.o: aes.h
