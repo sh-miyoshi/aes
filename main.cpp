@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include "aes.h"
+#include <stdio.h>
 
 int main() {
     unsigned char iv[16];
@@ -18,12 +18,12 @@ int main() {
     // puts(")");
 
     aes::AES handler(aes::AES_ECB, key, 128, iv);
-    aes::Error err = handler.Encrypt("README.md", "tmp/enc.dat");
+    aes::Error err = handler.Encrypt("tmp/test.txt", "tmp/enc.dat");
     if (!err.success) {
         printf("Failed to encrypt: %s\n", err.message.c_str());
         return 1;
     }
-    err = handler.Decrypt("tmp/enc.dat", "tmp/result.md");
+    err = handler.Decrypt("tmp/enc.dat", "tmp/result.txt");
     if (!err.success) {
         printf("Failed to decrypt: %s\n", err.message.c_str());
         return 1;

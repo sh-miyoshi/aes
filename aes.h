@@ -1,7 +1,7 @@
 #pragma once
 
-#include <wmmintrin.h>
 #include <string>
+#include <wmmintrin.h>
 
 // Please set USE_AES_NI to 1, if you want to use hardware accelerator.
 #define USE_AES_NI 1
@@ -13,13 +13,17 @@
 namespace aes {
 enum Mode {
     AES_ECB,
-    AES_CBC_ZERO,
-    AES_CBC_PKCS5,
+    AES_CBC,
     AES_CTR,
 };
 
+enum PaddingMode {
+    PADDING_ZERO,
+    PADDING_PKCS_5,
+};
+
 class Error {
-   public:
+  public:
     bool success;
     std::string message;
 
@@ -28,14 +32,16 @@ class Error {
 };
 
 class AES {
-    static const unsigned int MAX_NR = 14;  // max no of rounds
+    static const unsigned int MAX_NR = 14; // max no of rounds
 
-    unsigned int Nr;  // number of rounds
+    unsigned int Nr; // number of rounds
     Error initError;
     Mode mode;
+    PaddingMode paddingMode;
 
-    // TODO(Padding, RemovePadding methods)
     void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
+    void SetPadding(char *data, int size);
+    //void RemovePadding();
 #if USE_AES_NI
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
     __m128i vec;
@@ -50,7 +56,7 @@ class AES {
     __m128i OneRoundEncrypt(__m128i data);
     __m128i OneRoundDecrypt(__m128i data);
 #else
-    unsigned char iv[16];  // initialize vector
+    unsigned char iv[16]; // initialize vector
     unsigned char roundKey[16 * (MAX_NR + 1)];
 
     inline void ExtMul(unsigned char &x, unsigned char data, int n);
@@ -69,7 +75,7 @@ class AES {
     void OneRoundEncrypt(unsigned char *data);
     void OneRoundDecrypt(unsigned char *data);
 #endif
-   public:
+  public:
     // generate initialize vector
     static void GenerateIV(unsigned char *iv, Mode mode);
 
@@ -77,7 +83,9 @@ class AES {
     AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
     ~AES() {}
 
+    void SetPaddingMode(PaddingMode mode) { this->paddingMode = mode; }
+
     Error Encrypt(std::string in_fname, std::string out_fname);
     Error Decrypt(std::string in_fname, std::string out_fname);
 };
-};  // namespace aes
+}; // namespace aes

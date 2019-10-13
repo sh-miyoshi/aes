@@ -1,7 +1,7 @@
 #include "aes.h"
-#include <string.h>
 #include <random>
 #include <sstream>
+#include <string.h>
 using namespace aes;
 
 #define AES_BLOCK_SIZE (16)
@@ -61,20 +61,37 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
 
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
 
+    bool paddingFlag = false; // set true when run padding process
     while (1) {
         memset(buf, 0, sizeof(buf));
         int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
-        // TODO(check padding)
+
         if (readSize == 0) {
+            if (paddingMode == PADDING_PKCS_5 && paddingFlag) {
+                char t[AES_BLOCK_SIZE] = { 0 };
+                SetPadding(t, 0);
+                __m128i data = _mm_loadu_si128((__m128i *)t);
+                data = OneRoundEncrypt(data);
+                _mm_storeu_si128((__m128i *)res, data);
+                fwrite(res, sizeof(char), AES_BLOCK_SIZE, fp_out);
+            }
             break;
         }
 
+        int writeSize = 0;
         for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
-            int size = (readSize > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : readSize;
+            writeSize += AES_BLOCK_SIZE;
+            int trs = readSize - pointer;
+            int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
             char t[AES_BLOCK_SIZE] = { 0 };
             for (int i = 0; i < size; i++) {
                 t[i] = buf[pointer + i];
             }
+            SetPadding(t, size);
+            if (size != AES_BLOCK_SIZE) {
+                paddingFlag = true;
+            }
+
 #if USE_AES_NI
             __m128i data = _mm_loadu_si128((__m128i *)t);
             data = OneRoundEncrypt(data);
@@ -85,7 +102,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
             return err;
 #endif
         }
-        fwrite(res, sizeof(char), readSize, fp_out);
+        fwrite(res, sizeof(char), writeSize, fp_out);
     }
     fclose(fp_in);
     fclose(fp_out);
@@ -118,13 +135,45 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
 
+    char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
+
+    while (1) {
+        memset(buf, 0, sizeof(buf));
+        int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
+        if (readSize == 0) {
+            break;
+        }
+
+        for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+            char t[AES_BLOCK_SIZE] = { 0 };
+            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                t[i] = buf[pointer + i];
+            }
+#if USE_AES_NI
+            __m128i data = _mm_loadu_si128((__m128i *)t);
+            data = OneRoundDecrypt(data);
+            _mm_storeu_si128((__m128i *)(res + pointer), data);
+#else
+            err.success = false;
+            err.message = "Sorry, aes without hardware accelerator is not implemented yet";
+            return err;
+#endif
+        }
+        // TODO(check padding)
+        fwrite(res, sizeof(char), readSize, fp_out);
+    }
+
+    fclose(fp_in);
+    fclose(fp_out);
+
     return err;
 }
 
 void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv) {
     this->mode = mode;
+    this->paddingMode = PADDING_PKCS_5; // set default padding mode
 
-    unsigned int keyByteLen = keyBitLen / 8;  // maybe 16, 24, 32
+    unsigned int keyByteLen = keyBitLen / 8; // maybe 16, 24, 32
     if (keyBitLen != 128 && keyBitLen != 192 && keyBitLen != 256) {
         initError.success = false;
         std::stringstream ss;
@@ -143,15 +192,15 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
 
 #if USE_AES_NI
     switch (keyBitLen) {
-        case 128:
-            AES_128_Key_Expansion(encKey, userKey);
-            break;
-        case 192:
-            AES_192_Key_Expansion(encKey, userKey);
-            break;
-        case 256:
-            AES_256_Key_Expansion(encKey, userKey);
-            break;
+    case 128:
+        AES_128_Key_Expansion(encKey, userKey);
+        break;
+    case 192:
+        AES_192_Key_Expansion(encKey, userKey);
+        break;
+    case 256:
+        AES_256_Key_Expansion(encKey, userKey);
+        break;
     }
 
     decKey[Nr] = encKey[0];
@@ -169,6 +218,19 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
     initError.success = false;
     initError.message = "Sorry, aes without hardware accelerator is not implemented yet";
 #endif
+}
+
+void AES::SetPadding(char *data, int size) {
+    for (int i = size; i < AES_BLOCK_SIZE; i++) {
+        switch (paddingMode) {
+        case PADDING_PKCS_5:
+            data[i] = (AES_BLOCK_SIZE - size);
+            break;
+        case PADDING_ZERO:
+            data[i] = 0;
+            break;
+        }
+    }
 }
 
 #if USE_AES_NI
@@ -231,36 +293,36 @@ void AES::AES_128_Key_Expansion(__m128i *key, const unsigned char *userKey) {
     key[0] = temp1;
     for (int i = 1; i <= 10; i++) {
         switch (i) {
-            case 1:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x1);
-                break;
-            case 2:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x2);
-                break;
-            case 3:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x4);
-                break;
-            case 4:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x8);
-                break;
-            case 5:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x10);
-                break;
-            case 6:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x20);
-                break;
-            case 7:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x40);
-                break;
-            case 8:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x80);
-                break;
-            case 9:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x1b);
-                break;
-            case 10:
-                temp2 = _mm_aeskeygenassist_si128(temp1, 0x36);
-                break;
+        case 1:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x1);
+            break;
+        case 2:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x2);
+            break;
+        case 3:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x4);
+            break;
+        case 4:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x8);
+            break;
+        case 5:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x10);
+            break;
+        case 6:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x20);
+            break;
+        case 7:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x40);
+            break;
+        case 8:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x80);
+            break;
+        case 9:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x1b);
+            break;
+        case 10:
+            temp2 = _mm_aeskeygenassist_si128(temp1, 0x36);
+            break;
         }
         temp1 = AES_128_ASSIST(temp1, temp2);
         key[i] = temp1;
@@ -275,35 +337,35 @@ void AES::AES_192_Key_Expansion(__m128i *key, const unsigned char *userKey) {
         key[i] = temp1;
         key[i + 1] = temp3;
         switch (i) {
-            case 0:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x1);
-                break;
-            case 3:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x4);
-                break;
-            case 6:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x10);
-                break;
-            case 9:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x40);
-                break;
+        case 0:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x1);
+            break;
+        case 3:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x4);
+            break;
+        case 6:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x10);
+            break;
+        case 9:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x40);
+            break;
         }
         AES_192_ASSIST(temp1, temp2, temp3);
         key[i + 1] = (__m128i)_mm_shuffle_pd((__m128d)key[i + 1], (__m128d)temp1, 0);
         key[i + 2] = (__m128i)_mm_shuffle_pd((__m128d)temp1, (__m128d)temp3, 1);
         switch (i) {
-            case 0:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x2);
-                break;
-            case 3:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x8);
-                break;
-            case 6:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x20);
-                break;
-            case 9:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x80);
-                break;
+        case 0:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x2);
+            break;
+        case 3:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x8);
+            break;
+        case 6:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x20);
+            break;
+        case 9:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x80);
+            break;
         }
         AES_192_ASSIST(temp1, temp2, temp3);
     }
@@ -319,24 +381,24 @@ void AES::AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey) {
     key[1] = temp3;
     for (int i = 2; i <= 12; i += 2) {
         switch (i) {
-            case 2:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x01);
-                break;
-            case 4:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x02);
-                break;
-            case 6:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x04);
-                break;
-            case 8:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x08);
-                break;
-            case 10:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x010);
-                break;
-            case 12:
-                temp2 = _mm_aeskeygenassist_si128(temp3, 0x020);
-                break;
+        case 2:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x01);
+            break;
+        case 4:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x02);
+            break;
+        case 6:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x04);
+            break;
+        case 8:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x08);
+            break;
+        case 10:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x010);
+            break;
+        case 12:
+            temp2 = _mm_aeskeygenassist_si128(temp3, 0x020);
+            break;
         }
         AES_256_ASSIST_1(temp1, temp2);
         key[i] = temp1;
@@ -350,15 +412,15 @@ void AES::AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey) {
 
 __m128i AES::OneRoundEncrypt(__m128i data) {
     switch (mode) {
-        case AES_ECB:
-            // Nothing to do
-            break;
-        case AES_CBC_ZERO:
-        case AES_CBC_PKCS5:
-            data = _mm_xor_si128(data, vec);
-            break;
-        case AES_CTR:
-            break;
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        data = _mm_xor_si128(data, vec);
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
     }
 
     // Encrypt
@@ -368,15 +430,15 @@ __m128i AES::OneRoundEncrypt(__m128i data) {
     }
 
     switch (mode) {
-        case AES_ECB:
-            // Nothing to do
-            break;
-        case AES_CBC_ZERO:
-        case AES_CBC_PKCS5:
-            vec = data;
-            break;
-        case AES_CTR:
-            break;
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        vec = data;
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
     }
 
     return _mm_aesenclast_si128(data, encKey[Nr]);
@@ -385,15 +447,15 @@ __m128i AES::OneRoundEncrypt(__m128i data) {
 __m128i AES::OneRoundDecrypt(__m128i data) {
     __m128i prevVec = vec;
     switch (mode) {
-        case AES_ECB:
-            // Nothing to do
-            break;
-        case AES_CBC_ZERO:
-        case AES_CBC_PKCS5:
-            vec = data;
-            break;
-        case AES_CTR:
-            break;
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        vec = data;
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
     }
 
     // Decrypt
@@ -404,15 +466,15 @@ __m128i AES::OneRoundDecrypt(__m128i data) {
     data = _mm_aesdeclast_si128(data, decKey[Nr]);
 
     switch (mode) {
-        case AES_ECB:
-            // Nothing to do
-            break;
-        case AES_CBC_ZERO:
-        case AES_CBC_PKCS5:
-            data = _mm_xor_si128(data, prevVec);
-            break;
-        case AES_CTR:
-            break;
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        data = _mm_xor_si128(data, prevVec);
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
     }
 
     return data;
