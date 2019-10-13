@@ -8,7 +8,7 @@
 // #define USE_AES_NI 0
 
 // FILE_READ_SIZE is a read byte size from file at once
-#define FILE_READ_SIZE 65536
+#define FILE_READ_SIZE (65536)
 
 namespace aes {
 enum Mode {
