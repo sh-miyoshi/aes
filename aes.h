@@ -11,6 +11,11 @@ public:
 		PADDING_ZERO,
 		PADDING_PKCS_5
 	};
+
+	typedef struct{
+		bool success;
+		std::string message;
+	}Error_t;
 private:
 	static const int MAX_NR=14;// max no of rounds
 	static const int FILE_READ_SIZE=65536;
@@ -28,7 +33,7 @@ private:
 	void AES_192_Key_Expansion(__m128i *key,const unsigned char *user_key);
 	void AES_256_Key_Expansion(__m128i *key,const unsigned char *user_key);
 #else
-	unsigned char iv[16];// initialization vector
+	unsigned char iv[16];// initialize vector
 	unsigned char roundKey[16*(MAX_NR+1)];
 
 	inline void ExtMul(unsigned char &x,unsigned char data,int n);
@@ -63,6 +68,6 @@ public:
 	void Decrypt_CBC(unsigned char *data,unsigned char *vec);
 #endif
 
-	void Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
-	void Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
+	Error_t Encrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
+	Error_t Decrypt(std::string in_fname,std::string out_fname,bool cbc,PaddingMode mode);
 };

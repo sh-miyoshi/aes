@@ -169,16 +169,22 @@ void AES::Decrypt_CBC(unsigned char *data,unsigned char *vec){
 
 #endif
 
-void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
+AES::Error_t AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
+	Error_t result;
+	result.success=true;
+
 	FILE *fp_in=fopen(in_fname.c_str(),"rb");
 	FILE *fp_out=fopen(out_fname.c_str(),"wb");
+
 	if(!fp_in){
-		std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
-		exit(1);
+		result.message=std::string("ERROR: cannot open file: ")+in_fname+"\n";
+		result.success=false;
+		return result;
 	}
 	if(!fp_out){
-		std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
-		exit(1);
+		result.message=std::string("ERROR: cannot open file: ")+out_fname+"\n";
+		result.success=false;
+		return result;
 	}
 	char buf[FILE_READ_SIZE],ret[FILE_READ_SIZE];
 	bool is_padding=false;
@@ -243,24 +249,37 @@ void AES::Encrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 	}
 	fclose(fp_in);
 	fclose(fp_out);
+
+	return result;
 }
 
-void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
+AES::Error_t AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::PaddingMode mode){
+	Error_t result;
+	result.success=true;
+
 	FILE *fp_in=fopen(in_fname.c_str(),"rb");
 	FILE *fp_out=fopen(out_fname.c_str(),"wb");
+
 	if(!fp_in){
-		std::cerr<<"ERROR: cannot open file: "<<in_fname<<"\n";
-		exit(1);
+		result.message=std::string("ERROR: cannot open file: ")+in_fname+"\n";
+		result.success=false;
+		return result;
 	}
 	if(!fp_out){
-		std::cerr<<"ERROR: cannot open file: "<<out_fname<<"\n";
-		exit(1);
+		result.message=std::string("ERROR: cannot open file: ")+out_fname+"\n";
+		result.success=false;
+		return result;
 	}
 	char buf[2][FILE_READ_SIZE],dec[FILE_READ_SIZE],ret[FILE_READ_SIZE];
 	memset(buf[0],0,sizeof(buf[0]));
 	int size=fread(buf[0],sizeof(char),FILE_READ_SIZE,fp_in);
-	if(size==0)
-		return;
+	if(size==0){
+		result.message="no readable data\n";
+		result.success=false;
+		fclose(fp_in);
+		fclose(fp_out);
+		return result;
+	}
 #ifdef USE_AES_NI
 	__m128i cbc_vec=iv;
 #else
@@ -311,6 +330,8 @@ void AES::Decrypt(std::string in_fname,std::string out_fname,bool cbc,AES::Paddi
 	}
 	fclose(fp_in);
 	fclose(fp_out);
+
+	return result;
 }
 
 #ifdef USE_AES_NI
