@@ -1,23 +1,38 @@
-# 概要
-	AESによるファイル暗号化プログラムです
+# AES Library
 
-# 使い方
-	aes.exe (--enc or --dec) [options] 入力ファイル名 出力ファイル名
+## 概要
 
-	1. 以下のどちらかを指定してください
-		--enc 入力ファイルを暗号化します
-		--dec 入力ファイルを復号します
-	2. オプション
-		--cbc CBCモードで暗号化します
-		--pad-zero パディングモードを指定します(ゼロパディング)
-		--pad-pkcs5 パディングモードを指定します(PKCS#5パディング, デフォルトはこちらです)
-		-l or --keylen "key_length" AESの鍵長を指定します(128 or 192 or 256, デフォルトは128です)
-		-p or --password "password" パスワードを指定します
-	3. パスワード
-		-pオプションを使用しない場合対話形式でパスワードを入力できます
+このリポジトリではc++実装によるAESのライブラリとそれを用いたファイル暗号化プログラムを公開しています。
 
-# 著者
-	Shunsuke Miyoshi
+## 使い方(プログラム編)
 
-# ライセンス
-	This software is released under the MIT License, see LICENSE.txt.
+- windowsの場合
+
+```bash
+# TBD
+```
+
+- Linuxの場合
+
+```bash
+# TBD
+```
+
+## 使い方(ライブラリ編)
+
+`aes.h`と`aes.cpp`を自身のプログラムに加えていただくだけです。  
+
+### 使用例
+
+```cpp
+// TBD
+```
+
+## 著者
+
+Shunsuke Miyoshi
+
+## ライセンス
+
+このプログラムはMITライセンスでリリースされています。  
+詳細は[ライセンスファイル](./LICENSE)を参照してください。
