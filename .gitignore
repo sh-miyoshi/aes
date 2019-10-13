@@ -5,3 +5,6 @@ tmp/*
 *.o
 aes
 aes.exe
+
+# vscode
+.vscode/*
