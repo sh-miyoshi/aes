@@ -44,7 +44,7 @@ class AES {
     int GetDataSizeWithoutPadding(const char *data);
 #if USE_AES_NI
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
-    __m128i vec;
+    __m128i iv, vec;
     __m128i AES_128_ASSIST(__m128i temp1, __m128i temp2);
     void AES_192_ASSIST(__m128i &temp1, __m128i &temp2, __m128i &temp3);
     void AES_256_ASSIST_1(__m128i &temp1, __m128i &temp2);

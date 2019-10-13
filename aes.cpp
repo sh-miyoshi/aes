@@ -59,8 +59,12 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
 
-    char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
+#if USE_AES_NI
+    _mm_storeu_si128(&this->vec, this->iv);
+#else
+#endif
 
+    char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
     bool paddingFlag = false; // set true when run padding process
     while (1) {
         memset(buf, 0, sizeof(buf));
@@ -133,6 +137,11 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         err.message = ss.str();
         return err;
     }
+
+#if USE_AES_NI
+    _mm_storeu_si128(&this->vec, this->iv);
+#else
+#endif
 
     char prevBuf[FILE_READ_SIZE], buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
     int readSize = fread(prevBuf, sizeof(char), FILE_READ_SIZE, fp_in);
@@ -228,9 +237,9 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
     decKey[0] = encKey[Nr];
 
     if (!iv) {
-        this->vec = _mm_setzero_si128();
+        this->iv = _mm_setzero_si128();
     } else {
-        this->vec = _mm_loadu_si128((__m128i *)iv);
+        this->iv = _mm_loadu_si128((__m128i *)iv);
     }
 #else
     // TODO(not implemented yet)
@@ -465,6 +474,7 @@ __m128i AES::OneRoundEncrypt(__m128i data) {
     for (int i = 1; i < Nr; i++) {
         data = _mm_aesenc_si128(data, encKey[i]);
     }
+    data = _mm_aesenclast_si128(data, encKey[Nr]);
 
     switch (mode) {
     case AES_ECB:
@@ -478,7 +488,7 @@ __m128i AES::OneRoundEncrypt(__m128i data) {
         break;
     }
 
-    return _mm_aesenclast_si128(data, encKey[Nr]);
+    return data;
 }
 
 __m128i AES::OneRoundDecrypt(__m128i data) {
