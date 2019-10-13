@@ -67,7 +67,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
         int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
 
         if (readSize == 0) {
-            if (paddingMode == PADDING_PKCS_5 && paddingFlag) {
+            if (paddingMode == PADDING_PKCS_5 && !paddingFlag) {
                 char t[AES_BLOCK_SIZE] = { 0 };
                 SetPadding(t, 0);
                 __m128i data = _mm_loadu_si128((__m128i *)t);
@@ -127,7 +127,6 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
     if (!fp_out) {
-        Error err;
         std::stringstream ss;
         ss << "Failed to open output file: " << out_fname;
         err.success = false;
@@ -135,15 +134,18 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
 
-    char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
+    char prevBuf[FILE_READ_SIZE], buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
+    int readSize = fread(prevBuf, sizeof(char), FILE_READ_SIZE, fp_in);
+    if (readSize == 0) {
+        err.success = false;
+        err.message = "no readable data";
+        fclose(fp_in);
+        fclose(fp_out);
+        return err;
+    }
 
     while (1) {
-        memset(buf, 0, sizeof(buf));
-        int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
-        if (readSize == 0) {
-            break;
-        }
-
+        memcpy(buf, prevBuf, readSize);
         for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
             char t[AES_BLOCK_SIZE] = { 0 };
             for (int i = 0; i < AES_BLOCK_SIZE; i++) {
@@ -159,8 +161,25 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
             return err;
 #endif
         }
-        // TODO(check padding)
-        fwrite(res, sizeof(char), readSize, fp_out);
+        if (readSize < FILE_READ_SIZE) {
+            fwrite(res, sizeof(char), readSize - AES_BLOCK_SIZE, fp_out);
+            int index = (readSize - AES_BLOCK_SIZE);
+            // write last data (remove padding)
+            int s = GetDataSizeWithoutPadding(res + index);
+            fwrite(res + index, sizeof(char), s, fp_out);
+            break;
+        } else {
+            int rs = fread(prevBuf, sizeof(char), FILE_READ_SIZE, fp_in);
+            if (rs == 0) {
+                fwrite(res, sizeof(char), readSize - AES_BLOCK_SIZE, fp_out);
+                int index = (readSize - AES_BLOCK_SIZE);
+                // write last data (remove padding)
+                int s = GetDataSizeWithoutPadding(res + index);
+                fwrite(res + index, sizeof(char), s, fp_out);
+                break;
+            }
+            readSize = rs;
+        }
     }
 
     fclose(fp_in);
@@ -231,6 +250,24 @@ void AES::SetPadding(char *data, int size) {
             break;
         }
     }
+}
+
+int AES::GetDataSizeWithoutPadding(const char *data) {
+    int res = 0;
+    switch (paddingMode) {
+    case PADDING_PKCS_5:
+        res = AES_BLOCK_SIZE - data[AES_BLOCK_SIZE - 1];
+        break;
+    case PADDING_ZERO:
+        for (res = AES_BLOCK_SIZE - 1; res >= 0; res--) {
+            if (data[res] != 0) {
+                res++;
+                break;
+            }
+        }
+        break;
+    }
+    return res;
 }
 
 #if USE_AES_NI
