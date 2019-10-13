@@ -123,9 +123,9 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
     decKey[0] = encKey[Nr];
 
     if (!iv) {
-        this->iv = _mm_setzero_si128();
+        this->vec = _mm_setzero_si128();
     } else {
-        this->iv = _mm_loadu_si128((__m128i *)iv);
+        this->vec = _mm_loadu_si128((__m128i *)iv);
     }
 #else
     // TODO(not implemented yet)
@@ -142,23 +142,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     return Error();
 }
 
-Error AES::Encrypt(std::string in_message, std::string *out_message) {
-    if (!initError.success) {
-        return initError;
-    }
-
-    return Error();
-}
-
 Error AES::Decrypt(std::string in_fname, std::string out_fname) {
-    if (!initError.success) {
-        return initError;
-    }
-
-    return Error();
-}
-
-Error AES::Decrypt(std::string in_message, std::string *out_message) {
     if (!initError.success) {
         return initError;
     }
@@ -341,5 +325,75 @@ void AES::AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey) {
     temp2 = _mm_aeskeygenassist_si128(temp3, 0x40);
     AES_256_ASSIST_1(temp1, temp2);
     key[14] = temp1;
+}
+
+__m128i AES::OneRoundEncrypt(__m128i data) {
+    switch (mode) {
+        case AES_ECB:
+            // Nothing to do
+            break;
+        case AES_CBC_ZERO:
+        case AES_CBC_PKCS5:
+            data = _mm_xor_si128(data, vec);
+            break;
+        case AES_CTR:
+            break;
+    }
+
+    // Encrypt
+    data = _mm_xor_si128(data, encKey[0]);
+    for (int i = 1; i < Nr; i++) {
+        data = _mm_aesenc_si128(data, encKey[i]);
+    }
+
+    switch (mode) {
+        case AES_ECB:
+            // Nothing to do
+            break;
+        case AES_CBC_ZERO:
+        case AES_CBC_PKCS5:
+            vec = data;
+            break;
+        case AES_CTR:
+            break;
+    }
+
+    return _mm_aesenclast_si128(data, encKey[Nr]);
+}
+
+__m128i AES::OneRoundDecrypt(__m128i data) {
+    __m128i prevVec = vec;
+    switch (mode) {
+        case AES_ECB:
+            // Nothing to do
+            break;
+        case AES_CBC_ZERO:
+        case AES_CBC_PKCS5:
+            vec = data;
+            break;
+        case AES_CTR:
+            break;
+    }
+
+    // Decrypt
+    data = _mm_xor_si128(data, decKey[0]);
+    for (int i = 1; i < Nr; i++) {
+        data = _mm_aesdec_si128(data, decKey[i]);
+    }
+    data = _mm_aesdeclast_si128(data, decKey[Nr]);
+
+    switch (mode) {
+        case AES_ECB:
+            // Nothing to do
+            break;
+        case AES_CBC_ZERO:
+        case AES_CBC_PKCS5:
+            data = _mm_xor_si128(data, prevVec);
+            break;
+        case AES_CTR:
+            break;
+    }
+
+    return data;
 }
 #endif

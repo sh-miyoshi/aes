@@ -38,7 +38,7 @@ class AES {
     void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
 #if USE_AES_NI
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
-    __m128i iv;  // initialization vector
+    __m128i vec;
     __m128i AES_128_ASSIST(__m128i temp1, __m128i temp2);
     void AES_192_ASSIST(__m128i &temp1, __m128i &temp2, __m128i &temp3);
     void AES_256_ASSIST_1(__m128i &temp1, __m128i &temp2);
@@ -78,8 +78,6 @@ class AES {
     ~AES() {}
 
     Error Encrypt(std::string in_fname, std::string out_fname);
-    Error Encrypt(std::string in_message, std::string *out_message);
     Error Decrypt(std::string in_fname, std::string out_fname);
-    Error Decrypt(std::string in_message, std::string *out_message);
 };
 };  // namespace aes
