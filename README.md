@@ -7,16 +7,31 @@
 ## 使い方(プログラム編)
 
 - windowsの場合
+  - ブラウザから[https://github.com/sh-miyoshi/AES/releases/download/v2.0/aes.exe](https://github.com/sh-miyoshi/AES/releases/download/v2.0/aes.exe)にアクセス
+  - aes.exeを任意の場所の保存
+  - コマンドプロンプトを開き、以下を実行
 
-```bash
-# TBD
-```
+  ```bash
+  # 暗号化の場合
+  ./aes.exe --enc input.txt encrypt.dat
+
+  # 復号の場合
+  ./aes.exe --dec encrypt.dat output.txt
+  ```
 
 - Linuxの場合
+  - コマンドラインで以下を実行する
 
-```bash
-# TBD
-```
+  ```bash
+  wget https://github.com/sh-miyoshi/AES/releases/download/v2.0/aes
+  chmod +x aes
+
+  # 暗号化の場合
+  ./aes --enc input.txt encrypt.dat
+
+  # 復号の場合
+  ./aes --dec encrypt.dat output.txt
+  ```
 
 ## 使い方(ライブラリ編)
 
@@ -66,6 +81,20 @@ int main() {
         return 1;
     }
 }
+```
+
+## プログラムに関して
+
+__!!!注意点!!!__  
+このプログラムにはパスフレーズからAESのIVを生成する場所にセキュアでない場所があります。  
+また、実行中のメモリ状態まで意識して開発していないので本当にセキュアな実装が必要な場合は使用しないでください。
+
+ハードウェアアクセラレーター(AES NI命令)が使用できない場合は`aes.h`の以下の場所を変更してください。
+
+```cpp
+#define USE_AES_NI 1 // 変更前
+// ↓
+#define USE_AES_NI 0 // 変更後
 ```
 
 ## 著者
