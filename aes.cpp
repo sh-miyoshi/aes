@@ -65,22 +65,13 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
         return initError;
     }
 
-    Error err;
-    FILE *fp_in = fopen(in_fname.c_str(), "rb");
-    FILE *fp_out = fopen(out_fname.c_str(), "wb");
-
-    if (!fp_in) {
-        std::stringstream ss;
-        ss << "Failed to open input file: " << in_fname;
-        err.success = false;
-        err.message = ss.str();
+    FILE *fp_in, *fp_out;
+    Error err = FileOpen(&fp_in, in_fname, "rb");
+    if (!err.success) {
         return err;
     }
-    if (!fp_out) {
-        std::stringstream ss;
-        ss << "Failed to open output file: " << out_fname;
-        err.success = false;
-        err.message = ss.str();
+    err = FileOpen(&fp_out, out_fname, "wb");
+    if (!err.success) {
         return err;
     }
 
@@ -97,6 +88,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     while (1) {
         memset(buf, 0, sizeof(buf));
         int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
+        printf("%d\n", readSize);
 
         if (readSize == 0) {
             if (paddingMode == PADDING_PKCS_5 && !paddingFlag) {
@@ -163,22 +155,13 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         return initError;
     }
 
-    Error err;
-    FILE *fp_in = fopen(in_fname.c_str(), "rb");
-    FILE *fp_out = fopen(out_fname.c_str(), "wb");
-
-    if (!fp_in) {
-        std::stringstream ss;
-        ss << "Failed to open input file: " << in_fname;
-        err.success = false;
-        err.message = ss.str();
+    FILE *fp_in, *fp_out;
+    Error err = FileOpen(&fp_in, in_fname, "rb");
+    if (!err.success) {
         return err;
     }
-    if (!fp_out) {
-        std::stringstream ss;
-        ss << "Failed to open output file: " << out_fname;
-        err.success = false;
-        err.message = ss.str();
+    err = FileOpen(&fp_out, out_fname, "wb");
+    if (!err.success) {
         return err;
     }
 
@@ -334,6 +317,18 @@ int AES::GetDataSizeWithoutPadding(const char *data) {
         break;
     }
     return res;
+}
+
+Error AES::FileOpen(FILE **fp, std::string fname, std::string mode) {
+    Error err;
+    *fp = fopen(fname.c_str(), mode.c_str());
+    if (!(*fp)) {
+        std::stringstream ss;
+        ss << "Failed to open file: " << fname;
+        err.success = false;
+        err.message = ss.str();
+    }
+    return err;
 }
 
 #if USE_AES_NI

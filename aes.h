@@ -44,6 +44,7 @@ class AES {
     void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
     void SetPadding(char *data, int size);
     int GetDataSizeWithoutPadding(const char *data);
+    Error FileOpen(FILE **fp, std::string fname, std::string mode);
 #if USE_AES_NI
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
     __m128i iv, vec;
