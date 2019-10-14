@@ -56,8 +56,8 @@ class AES {
     void AES_192_Key_Expansion(__m128i *key, const unsigned char *userKey);
     void AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey);
 
-    __m128i OneRoundEncrypt(__m128i data);
-    __m128i OneRoundDecrypt(__m128i data);
+    __m128i EncryptCore(__m128i data);
+    __m128i DecryptCore(__m128i data);
 #else
     unsigned char iv[AES_BLOCK_SIZE]; // initialize vector
     unsigned char vec[AES_BLOCK_SIZE];
@@ -76,8 +76,8 @@ class AES {
     inline void InvMixColumns(unsigned char *data);
     inline void AddRoundKey(unsigned char *data, int n);
 
-    void OneRoundEncrypt(unsigned char *data);
-    void OneRoundDecrypt(unsigned char *data);
+    void EncryptCore(unsigned char *data);
+    void DecryptCore(unsigned char *data);
 #endif
   public:
     // generate initialize vector

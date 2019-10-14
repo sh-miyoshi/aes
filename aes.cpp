@@ -86,24 +86,21 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
     bool paddingFlag = false; // set true when run padding process
     while (1) {
-        memset(buf, 0, sizeof(buf));
         int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
-        printf("%d\n", readSize);
-
         if (readSize == 0) {
             if (paddingMode == PADDING_PKCS_5 && !paddingFlag) {
                 char t[AES_BLOCK_SIZE] = { 0 };
                 SetPadding(t, 0);
 #if USE_AES_NI
                 __m128i data = _mm_loadu_si128((__m128i *)t);
-                data = OneRoundEncrypt(data);
+                data = EncryptCore(data);
                 _mm_storeu_si128((__m128i *)res, data);
 #else
                 unsigned char data[AES_BLOCK_SIZE];
                 for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                     data[i] = (unsigned char)t[i];
                 }
-                OneRoundEncrypt(data);
+                EncryptCore(data);
                 for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                     res[i] = data[i];
                 }
@@ -129,14 +126,14 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
 
 #if USE_AES_NI
             __m128i data = _mm_loadu_si128((__m128i *)t);
-            data = OneRoundEncrypt(data);
+            data = EncryptCore(data);
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
             unsigned char data[AES_BLOCK_SIZE];
             for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                 data[i] = (unsigned char)t[i];
             }
-            OneRoundEncrypt(data);
+            EncryptCore(data);
             for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                 res[pointer + i] = data[i];
             }
@@ -192,14 +189,14 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
             }
 #if USE_AES_NI
             __m128i data = _mm_loadu_si128((__m128i *)t);
-            data = OneRoundDecrypt(data);
+            data = DecryptCore(data);
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
             unsigned char data[AES_BLOCK_SIZE];
             for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                 data[i] = (unsigned char)t[i];
             }
-            OneRoundDecrypt(data);
+            DecryptCore(data);
             for (int i = 0; i < AES_BLOCK_SIZE; i++) {
                 res[pointer + i] = data[i];
             }
@@ -508,7 +505,7 @@ void AES::AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey) {
     key[14] = temp1;
 }
 
-__m128i AES::OneRoundEncrypt(__m128i data) {
+__m128i AES::EncryptCore(__m128i data) {
     switch (mode) {
     case AES_ECB:
         // Nothing to do
@@ -543,7 +540,7 @@ __m128i AES::OneRoundEncrypt(__m128i data) {
     return data;
 }
 
-__m128i AES::OneRoundDecrypt(__m128i data) {
+__m128i AES::DecryptCore(__m128i data) {
     __m128i prevVec = vec;
     switch (mode) {
     case AES_ECB:
@@ -802,7 +799,7 @@ void AES::KeyExpansion(const unsigned char *userKey, int wordKeyLength) {
     }
 }
 
-void AES::OneRoundEncrypt(unsigned char *data) {
+void AES::EncryptCore(unsigned char *data) {
     switch (mode) {
     case AES_ECB:
         // Nothing to do
@@ -844,7 +841,7 @@ void AES::OneRoundEncrypt(unsigned char *data) {
         break;
     }
 }
-void AES::OneRoundDecrypt(unsigned char *data) {
+void AES::DecryptCore(unsigned char *data) {
     unsigned char prevVec[AES_BLOCK_SIZE];
     for (int i = 0; i < AES_BLOCK_SIZE; i++)
         prevVec[i] = vec[i];
