@@ -8,12 +8,15 @@
 #include "option.h"
 #include <iostream>
 #include <stdio.h>
+#include <time.h>
 
 #ifdef _WINDOWS
 #include <conio.h>
 #else
 #include <unistd.h>
 #endif
+
+// #define TIME_MEASUREMENT
 
 enum RunMode {
     RUN_UNDEFINED,
