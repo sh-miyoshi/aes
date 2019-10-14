@@ -93,7 +93,13 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
                 SetPadding(t, 0);
 #if USE_AES_NI
                 __m128i data = _mm_loadu_si128((__m128i *)t);
+                if(mode==AES_CBC){
+                    data = _mm_xor_si128(data, vec);
+                }
                 data = EncryptCore(data);
+                if(mode==AES_CBC){
+                    vec = data;
+                }
                 _mm_storeu_si128((__m128i *)res, data);
 #else
                 unsigned char data[AES_BLOCK_SIZE];
@@ -126,7 +132,13 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
 
 #if USE_AES_NI
             __m128i data = _mm_loadu_si128((__m128i *)t);
+            if(mode==AES_CBC){
+                data = _mm_xor_si128(data, vec);
+            }
             data = EncryptCore(data);
+            if(mode==AES_CBC){
+                vec = data;
+            }
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
             unsigned char data[AES_BLOCK_SIZE];
@@ -189,7 +201,14 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
             }
 #if USE_AES_NI
             __m128i data = _mm_loadu_si128((__m128i *)t);
+            __m128i prevVec = vec;
+            if(mode==AES_CBC){
+                vec=data;
+            }
             data = DecryptCore(data);
+            if(mode==AES_CBC){
+                data = _mm_xor_si128(data, prevVec);
+            }
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
             unsigned char data[AES_BLOCK_SIZE];
@@ -506,74 +525,19 @@ void AES::AES_256_Key_Expansion(__m128i *key, const unsigned char *userKey) {
 }
 
 __m128i AES::EncryptCore(__m128i data) {
-    switch (mode) {
-    case AES_ECB:
-        // Nothing to do
-        break;
-    case AES_CBC:
-        data = _mm_xor_si128(data, vec);
-        break;
-    case AES_CTR:
-        // TODO(not implemented yet)
-        break;
-    }
-
-    // Encrypt
     data = _mm_xor_si128(data, encKey[0]);
     for (int i = 1; i < Nr; i++) {
         data = _mm_aesenc_si128(data, encKey[i]);
     }
-    data = _mm_aesenclast_si128(data, encKey[Nr]);
-
-    switch (mode) {
-    case AES_ECB:
-        // Nothing to do
-        break;
-    case AES_CBC:
-        vec = data;
-        break;
-    case AES_CTR:
-        // TODO(not implemented yet)
-        break;
-    }
-
-    return data;
+    return _mm_aesenclast_si128(data, encKey[Nr]);
 }
 
 __m128i AES::DecryptCore(__m128i data) {
-    __m128i prevVec = vec;
-    switch (mode) {
-    case AES_ECB:
-        // Nothing to do
-        break;
-    case AES_CBC:
-        vec = data;
-        break;
-    case AES_CTR:
-        // TODO(not implemented yet)
-        break;
-    }
-
-    // Decrypt
     data = _mm_xor_si128(data, decKey[0]);
     for (int i = 1; i < Nr; i++) {
         data = _mm_aesdec_si128(data, decKey[i]);
     }
-    data = _mm_aesdeclast_si128(data, decKey[Nr]);
-
-    switch (mode) {
-    case AES_ECB:
-        // Nothing to do
-        break;
-    case AES_CBC:
-        data = _mm_xor_si128(data, prevVec);
-        break;
-    case AES_CTR:
-        // TODO(not implemented yet)
-        break;
-    }
-
-    return data;
+    return _mm_aesdeclast_si128(data, decKey[Nr]);
 }
 
 #else
