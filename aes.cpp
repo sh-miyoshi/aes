@@ -4,8 +4,6 @@
 #include <string.h>
 using namespace aes;
 
-#define AES_BLOCK_SIZE (16)
-
 void AES::GenerateIV(unsigned char *iv, Mode mode) {
     std::random_device rand_dev;
 
@@ -20,7 +18,7 @@ void AES::GenerateIV(unsigned char *iv, Mode mode) {
         iv[15] = 1;
     } else {
         // set all random data
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
             iv[i] = (unsigned char)rand_dev();
         }
     }
@@ -47,7 +45,7 @@ void AES::GenerateIV(unsigned char *iv, std::string passpharse, Mode mode) {
         iv[15] = 1;
     } else {
         // set all random data
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
             iv[i] = (unsigned char)engine();
         }
     }
@@ -89,6 +87,9 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
 #if USE_AES_NI
     _mm_storeu_si128(&this->vec, this->iv);
 #else
+    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+        vec[i] = iv[i];
+    }
 #endif
 
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
@@ -101,9 +102,20 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
             if (paddingMode == PADDING_PKCS_5 && !paddingFlag) {
                 char t[AES_BLOCK_SIZE] = { 0 };
                 SetPadding(t, 0);
+#if USE_AES_NI
                 __m128i data = _mm_loadu_si128((__m128i *)t);
                 data = OneRoundEncrypt(data);
                 _mm_storeu_si128((__m128i *)res, data);
+#else
+                unsigned char data[AES_BLOCK_SIZE];
+                for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                    data[i] = (unsigned char)t[i];
+                }
+                OneRoundEncrypt(data);
+                for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                    res[i] = data[i];
+                }
+#endif
                 fwrite(res, sizeof(char), AES_BLOCK_SIZE, fp_out);
             }
             break;
@@ -128,9 +140,14 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
             data = OneRoundEncrypt(data);
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
-            err.success = false;
-            err.message = "Sorry, aes without hardware accelerator is not implemented yet";
-            return err;
+            unsigned char data[AES_BLOCK_SIZE];
+            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                data[i] = (unsigned char)t[i];
+            }
+            OneRoundEncrypt(data);
+            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                res[pointer + i] = data[i];
+            }
 #endif
         }
         fwrite(res, sizeof(char), writeSize, fp_out);
@@ -168,6 +185,9 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
 #if USE_AES_NI
     _mm_storeu_si128(&this->vec, this->iv);
 #else
+    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+        vec[i] = iv[i];
+    }
 #endif
 
     char prevBuf[FILE_READ_SIZE], buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
@@ -192,9 +212,14 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
             data = OneRoundDecrypt(data);
             _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
-            err.success = false;
-            err.message = "Sorry, aes without hardware accelerator is not implemented yet";
-            return err;
+            unsigned char data[AES_BLOCK_SIZE];
+            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                data[i] = (unsigned char)t[i];
+            }
+            OneRoundDecrypt(data);
+            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+                res[pointer + i] = data[i];
+            }
 #endif
         }
         if (readSize < FILE_READ_SIZE) {
@@ -269,9 +294,14 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
         this->iv = _mm_loadu_si128((__m128i *)iv);
     }
 #else
-    // TODO(not implemented yet)
-    initError.success = false;
-    initError.message = "Sorry, aes without hardware accelerator is not implemented yet";
+    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+        if (!iv) {
+            this->iv[i] = 0;
+        } else {
+            this->iv[i] = iv[i];
+        }
+    }
+    KeyExpansion(userKey, keyByteLen);
 #endif
 }
 
@@ -604,4 +634,264 @@ static const unsigned char INV_SBOX[256] = {
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63,
     0x55, 0x21, 0x0c, 0x7d
 };
+
+void AES::SubBytes(unsigned char *data) {
+    for (int i = 0; i < AES_BLOCK_SIZE; i++)
+        data[i] = SBOX[data[i]];
+}
+
+void AES::ShiftRows(unsigned char *data) {
+    unsigned char temp = data[4];
+
+    // line 1
+    data[4] = data[5];
+    data[5] = data[6];
+    data[6] = data[7];
+    data[7] = temp;
+
+    // line 2
+    temp = data[8];
+    data[8] = data[10];
+    data[10] = temp;
+    temp = data[9];
+    data[9] = data[11];
+    data[11] = temp;
+
+    // line 3
+    temp = data[15];
+    data[15] = data[14];
+    data[14] = data[13];
+    data[13] = data[12];
+    data[12] = temp;
+}
+
+void AES::MixColumns(unsigned char *data) {
+    // 要改善
+    // SIMDみたいな感じで
+    unsigned char buf[8];
+    for (int x = 0; x < 4; x++) {
+        for (int y = 0; y < 4; y++)
+            buf[y] = data[(y << 2) + x];
+        ExtMul(buf[4], buf[0], 2);
+        ExtMul(buf[5], buf[1], 3);
+        ExtMul(buf[6], buf[2], 1);
+        ExtMul(buf[7], buf[3], 1);
+        data[x + 0] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 1);
+        ExtMul(buf[5], buf[1], 2);
+        ExtMul(buf[6], buf[2], 3);
+        ExtMul(buf[7], buf[3], 1);
+        data[x + 4] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 1);
+        ExtMul(buf[5], buf[1], 1);
+        ExtMul(buf[6], buf[2], 2);
+        ExtMul(buf[7], buf[3], 3);
+        data[x + 8] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 3);
+        ExtMul(buf[5], buf[1], 1);
+        ExtMul(buf[6], buf[2], 1);
+        ExtMul(buf[7], buf[3], 2);
+        data[x + 12] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+    }
+}
+
+void AES::InvSubBytes(unsigned char *data) {
+    for (int i = 0; i < AES_BLOCK_SIZE; i++)
+        data[i] = INV_SBOX[data[i]];
+}
+
+void AES::InvShiftRows(unsigned char *data) {
+    // TODO(Required Improvement)
+    unsigned char buf[AES_BLOCK_SIZE];
+    memcpy(buf, data, sizeof(buf));
+    for (int i = 1; i < 4; i++) {
+        for (int j = 0; j < 4; j++)
+            data[i * 4 + (j + i) % 4] = buf[i * 4 + j];
+    }
+}
+
+void AES::InvMixColumns(unsigned char *data) {
+    // TODO(Required Improvement)
+    unsigned char x;
+    unsigned char buf[8];
+    for (int x = 0; x < 4; x++) {
+        for (int y = 0; y < 4; y++)
+            buf[y] = data[y * 4 + x];
+        ExtMul(buf[4], buf[0], 14);
+        ExtMul(buf[5], buf[1], 11);
+        ExtMul(buf[6], buf[2], 13);
+        ExtMul(buf[7], buf[3], 9);
+        data[x + 0] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 9);
+        ExtMul(buf[5], buf[1], 14);
+        ExtMul(buf[6], buf[2], 11);
+        ExtMul(buf[7], buf[3], 13);
+        data[x + 4] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 13);
+        ExtMul(buf[5], buf[1], 9);
+        ExtMul(buf[6], buf[2], 14);
+        ExtMul(buf[7], buf[3], 11);
+        data[x + 8] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+        ExtMul(buf[4], buf[0], 11);
+        ExtMul(buf[5], buf[1], 13);
+        ExtMul(buf[6], buf[2], 9);
+        ExtMul(buf[7], buf[3], 14);
+        data[x + 12] = buf[4] ^ buf[5] ^ buf[6] ^ buf[7];
+    }
+}
+
+void AES::AddRoundKey(unsigned char *data, int n) {
+    for (int i = 0; i < AES_BLOCK_SIZE; i++)
+        data[i] ^= roundKey[(n << 4) + i];
+}
+
+void AES::ExtMul(unsigned char &x, unsigned char data, int n) {
+    x = 0;
+    if (n & 8)
+        x = data;
+    bool flag = x & 0x80;
+    x <<= 1;
+    if (flag)
+        x ^= 0x1b;
+    if (n & 4)
+        x ^= data;
+    flag = x & 0x80;
+    x <<= 1;
+    if (flag)
+        x ^= 0x1b;
+    if (n & 2)
+        x ^= data;
+    flag = x & 0x80;
+    x <<= 1;
+    if (flag)
+        x ^= 0x1b;
+    if (n & 1)
+        x ^= data;
+}
+
+void AES::SubWord(unsigned char *w) {
+    for (int i = 0; i < 4; i++)
+        w[i] = SBOX[AES_BLOCK_SIZE * ((w[i] & 0xf0) >> 4) + (w[i] & 0x0f)];
+}
+
+void AES::RotWord(unsigned char *w) {
+    unsigned char temp = w[0];
+    for (int i = 0; i < 3; i++)
+        w[i] = w[i + 1];
+    w[3] = temp;
+}
+
+void AES::KeyExpansion(const unsigned char *userKey, int wordKeyLength) {
+    static const unsigned char Rcon[10] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36 };
+
+    unsigned char *w = roundKey, len = 4 * (Nr + 1), buf[4];
+    memcpy(w, userKey, wordKeyLength * 4);
+
+    for (int i = wordKeyLength; i < len; i++) {
+        buf[0] = w[4 * (i - 1) + 0];
+        buf[1] = w[4 * (i - 1) + 1];
+        buf[2] = w[4 * (i - 1) + 2];
+        buf[3] = w[4 * (i - 1) + 3];
+
+        if (i % wordKeyLength == 0) {
+            RotWord(buf);
+            SubWord(buf);
+            buf[0] ^= Rcon[(i / wordKeyLength) - 1];
+        } else if (wordKeyLength > 6 && i % wordKeyLength == 4)
+            SubWord(buf);
+
+        w[4 * i + 0] = w[4 * (i - wordKeyLength) + 0] ^ buf[0];
+        w[4 * i + 1] = w[4 * (i - wordKeyLength) + 1] ^ buf[1];
+        w[4 * i + 2] = w[4 * (i - wordKeyLength) + 2] ^ buf[2];
+        w[4 * i + 3] = w[4 * (i - wordKeyLength) + 3] ^ buf[3];
+    }
+}
+
+void AES::OneRoundEncrypt(unsigned char *data) {
+    switch (mode) {
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] ^= vec[i];
+        }
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
+    }
+
+    // Encrypt
+    AddRoundKey(data, 0);
+    for (int i = 1; i < Nr; i++) {
+        SubBytes(data);
+        ShiftRows(data);
+        MixColumns(data);
+        AddRoundKey(data, i);
+    }
+
+    SubBytes(data);
+    ShiftRows(data);
+    AddRoundKey(data, Nr);
+
+    switch (mode) {
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            vec[i] = data[i];
+        }
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
+    }
+}
+void AES::OneRoundDecrypt(unsigned char *data) {
+    unsigned char prevVec[AES_BLOCK_SIZE];
+    for (int i = 0; i < AES_BLOCK_SIZE; i++)
+        prevVec[i] = vec[i];
+    switch (mode) {
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            vec[i] = data[i];
+        }
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
+    }
+
+    // Decrypt
+    AddRoundKey(data, Nr);
+    for (int i = Nr - 1; i > 0; i--) {
+        InvShiftRows(data);
+        InvSubBytes(data);
+        AddRoundKey(data, i);
+        InvMixColumns(data);
+    }
+
+    InvShiftRows(data);
+    InvSubBytes(data);
+    AddRoundKey(data, 0);
+
+    switch (mode) {
+    case AES_ECB:
+        // Nothing to do
+        break;
+    case AES_CBC:
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] ^= prevVec[i];
+        }
+        break;
+    case AES_CTR:
+        // TODO(not implemented yet)
+        break;
+    }
+}
 #endif

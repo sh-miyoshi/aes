@@ -10,6 +10,8 @@
 // FILE_READ_SIZE is a read byte size from file at once
 #define FILE_READ_SIZE (65536)
 
+#define AES_BLOCK_SIZE (16)
+
 namespace aes {
 enum Mode {
     AES_ECB,
@@ -56,8 +58,9 @@ class AES {
     __m128i OneRoundEncrypt(__m128i data);
     __m128i OneRoundDecrypt(__m128i data);
 #else
-    unsigned char iv[16]; // initialize vector
-    unsigned char roundKey[16 * (MAX_NR + 1)];
+    unsigned char iv[AES_BLOCK_SIZE]; // initialize vector
+    unsigned char vec[AES_BLOCK_SIZE];
+    unsigned char roundKey[AES_BLOCK_SIZE * (MAX_NR + 1)];
 
     inline void ExtMul(unsigned char &x, unsigned char data, int n);
     void SubWord(unsigned char *w);
