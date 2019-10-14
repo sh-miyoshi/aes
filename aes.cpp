@@ -26,6 +26,33 @@ void AES::GenerateIV(unsigned char *iv, Mode mode) {
     }
 }
 
+void AES::GenerateIV(unsigned char *iv, std::string passpharse, Mode mode) {
+    // TODO(this is not secure: seed is too small)
+
+    // Use pseudo random number
+    unsigned int seed = 0;
+    for (char c : passpharse) {
+        seed += (unsigned int)c;
+    }
+    std::mt19937 engine(seed);
+
+    if (mode == AES_CTR) {
+        // [8bit nonce][8bit counter]
+        for (int i = 0; i < 8; i++) {
+            iv[i] = (unsigned char)engine();
+        }
+        for (int i = 8; i < 15; i++) {
+            iv[i] = 0;
+        }
+        iv[15] = 1;
+    } else {
+        // set all random data
+        for (int i = 0; i < 16; i++) {
+            iv[i] = (unsigned char)engine();
+        }
+    }
+}
+
 AES::AES(const unsigned char *key, unsigned int keyBitLen) {
     // ECB mode is the only mode which does not use iv
     Init(AES_ECB, key, keyBitLen, nullptr);

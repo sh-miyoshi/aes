@@ -80,6 +80,7 @@ class OpsParse {
 
     std::vector<std::string> opt_none;
     std::map<std::string, std::string> opt_val;
+    std::vector<std::string> args;
 
   public:
     OpsParse() {}
@@ -120,6 +121,8 @@ class OpsParse {
             } else {
                 if (def_none.count(val) != 0)
                     opt_none.push_back(val);
+                else if (val[0] != '-')
+                    args.push_back(val);
                 else
                     return false;
             }
@@ -134,5 +137,6 @@ class OpsParse {
 
     std::vector<std::string> GetOptionNone() const { return opt_none; }
     std::map<std::string, std::string> GetOptionValue() const { return opt_val; }
+    std::vector<std::string> GetArgs() const { return args; }
 };
 }; // namespace option

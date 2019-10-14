@@ -78,6 +78,7 @@ class AES {
   public:
     // generate initialize vector
     static void GenerateIV(unsigned char *iv, Mode mode);
+    static void GenerateIV(unsigned char *iv, std::string passpharse, Mode mode);
 
     AES(const unsigned char *key, unsigned int keyBitLen);
     AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
