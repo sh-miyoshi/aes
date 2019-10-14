@@ -1,5 +1,10 @@
-debug/*
+# temporary directory
+tmp/*
+
+# AES binaries
 *.o
 aes
 aes.exe
-todo.txt
+
+# vscode
+.vscode/*
