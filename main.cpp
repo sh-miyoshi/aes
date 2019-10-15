@@ -131,6 +131,8 @@ int main(int argc, char *argv[]) {
 
     // Run AES
     aes::AES handler(aesMode, key, keyLen, iv);
+    handler.SetPaddingMode(paddingMode);
+
     if (runMode == RUN_ENCRYPT) {
         handler.Encrypt(args[0], args[1]);
     } else if (runMode == RUN_DECRYPT) {
