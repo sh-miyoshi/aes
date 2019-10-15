@@ -44,16 +44,6 @@ class AES {
         virtual bool Finalize(char *res) { return false; }
     };
 
-    unsigned int Nr; // number of rounds
-    Error initError;
-    Mode mode;
-    PaddingMode paddingMode;
-
-    void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
-    void SetPadding(char *data, int size);
-    int GetDataSizeWithoutPadding(const char *data);
-    Error FileOpen(FILE **fp, std::string fname, std::string mode);
-#if USE_AES_NI
     class EncryptECB : public EncryptBase {
         bool paddingFlag;
         AES *obj;
@@ -69,11 +59,19 @@ class AES {
 
     class EncryptCBC : public EncryptBase {
         bool paddingFlag;
-        __m128i vec;
         AES *obj;
+#if USE_AES_NI
+        __m128i vec;
+#else
+        unsigned char vec[AES_BLOCK_SIZE];
+#endif
 
       public:
+#if USE_AES_NI
         EncryptCBC(AES *obj, __m128i iv);
+#else
+        EncryptCBC(AES *obj, const unsigned char *iv);
+#endif
         ~EncryptCBC();
 
         int Encrypt(char *res, const char *readBuf, unsigned int readSize);
@@ -81,6 +79,16 @@ class AES {
         bool Finalize(char *res);
     };
 
+    unsigned int Nr; // number of rounds
+    Error initError;
+    Mode mode;
+    PaddingMode paddingMode;
+
+    void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
+    void SetPadding(char *data, int size);
+    int GetDataSizeWithoutPadding(const char *data);
+    Error FileOpen(FILE **fp, std::string fname, std::string mode);
+#if USE_AES_NI
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
     __m128i iv;
     __m128i AES_128_ASSIST(__m128i temp1, __m128i temp2);
@@ -95,7 +103,6 @@ class AES {
     __m128i DecryptCore(__m128i data);
 #else
     unsigned char iv[AES_BLOCK_SIZE]; // initialize vector
-    unsigned char vec[AES_BLOCK_SIZE];
     unsigned char roundKey[AES_BLOCK_SIZE * (MAX_NR + 1)];
 
     inline void ExtMul(unsigned char &x, unsigned char data, int n);
