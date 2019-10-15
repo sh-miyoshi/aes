@@ -51,6 +51,19 @@ void AES::GenerateIV(unsigned char *iv, std::string passpharse, Mode mode) {
     }
 }
 
+void AES::SetPadding(char *data, int size) {
+    for (int i = size; i < AES_BLOCK_SIZE; i++) {
+        switch (mode) {
+        case PADDING_PKCS_5:
+            data[i] = (AES_BLOCK_SIZE - size);
+            break;
+        case PADDING_ZERO:
+            data[i] = 0;
+            break;
+        }
+    }
+}
+
 AES::AES(const unsigned char *key, unsigned int keyBitLen) {
     // ECB mode is the only mode which does not use iv
     Init(AES_ECB, key, keyBitLen, nullptr);
@@ -75,82 +88,20 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
 
-#if USE_AES_NI
-    _mm_storeu_si128(&this->vec, this->iv);
-#else
-    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-        vec[i] = iv[i];
-    }
-#endif
+    EncryptBase *handler = nullptr;
+    handler = new EncryptCBC(this, iv);
 
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
-    bool paddingFlag = false; // set true when run padding process
     while (1) {
         int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
         if (readSize == 0) {
-            if (paddingMode == PADDING_PKCS_5 && !paddingFlag) {
-                char t[AES_BLOCK_SIZE] = { 0 };
-                SetPadding(t, 0);
-#if USE_AES_NI
-                __m128i data = _mm_loadu_si128((__m128i *)t);
-                if(mode==AES_CBC){
-                    data = _mm_xor_si128(data, vec);
-                }
-                data = EncryptCore(data);
-                if(mode==AES_CBC){
-                    vec = data;
-                }
-                _mm_storeu_si128((__m128i *)res, data);
-#else
-                unsigned char data[AES_BLOCK_SIZE];
-                for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                    data[i] = (unsigned char)t[i];
-                }
-                EncryptCore(data);
-                for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                    res[i] = data[i];
-                }
-#endif
+            if (handler->Finalize(res)) {
                 fwrite(res, sizeof(char), AES_BLOCK_SIZE, fp_out);
             }
             break;
         }
 
-        int writeSize = 0;
-        for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
-            writeSize += AES_BLOCK_SIZE;
-            int trs = readSize - pointer;
-            int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
-            char t[AES_BLOCK_SIZE] = { 0 };
-            for (int i = 0; i < size; i++) {
-                t[i] = buf[pointer + i];
-            }
-            SetPadding(t, size);
-            if (size != AES_BLOCK_SIZE) {
-                paddingFlag = true;
-            }
-
-#if USE_AES_NI
-            __m128i data = _mm_loadu_si128((__m128i *)t);
-            if(mode==AES_CBC){
-                data = _mm_xor_si128(data, vec);
-            }
-            data = EncryptCore(data);
-            if(mode==AES_CBC){
-                vec = data;
-            }
-            _mm_storeu_si128((__m128i *)(res + pointer), data);
-#else
-            unsigned char data[AES_BLOCK_SIZE];
-            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                data[i] = (unsigned char)t[i];
-            }
-            EncryptCore(data);
-            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                res[pointer + i] = data[i];
-            }
-#endif
-        }
+        int writeSize = handler->Encrypt(res, buf, readSize);
         fwrite(res, sizeof(char), writeSize, fp_out);
     }
     fclose(fp_in);
@@ -174,16 +125,11 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
         return err;
     }
 
-#if USE_AES_NI
-    _mm_storeu_si128(&this->vec, this->iv);
-#else
-    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-        vec[i] = iv[i];
-    }
-#endif
+    EncryptBase *handler = nullptr;
+    handler = new EncryptCBC(this, iv);
 
-    char prevBuf[FILE_READ_SIZE], buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
-    int readSize = fread(prevBuf, sizeof(char), FILE_READ_SIZE, fp_in);
+    char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
+    int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
     if (readSize == 0) {
         err.success = false;
         err.message = "no readable data";
@@ -193,34 +139,8 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
     }
 
     while (1) {
-        memcpy(buf, prevBuf, readSize);
-        for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
-            char t[AES_BLOCK_SIZE] = { 0 };
-            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                t[i] = buf[pointer + i];
-            }
-#if USE_AES_NI
-            __m128i data = _mm_loadu_si128((__m128i *)t);
-            __m128i prevVec = vec;
-            if(mode==AES_CBC){
-                vec=data;
-            }
-            data = DecryptCore(data);
-            if(mode==AES_CBC){
-                data = _mm_xor_si128(data, prevVec);
-            }
-            _mm_storeu_si128((__m128i *)(res + pointer), data);
-#else
-            unsigned char data[AES_BLOCK_SIZE];
-            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                data[i] = (unsigned char)t[i];
-            }
-            DecryptCore(data);
-            for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-                res[pointer + i] = data[i];
-            }
-#endif
-        }
+        handler->Decrypt(res, buf, readSize);
+
         if (readSize < FILE_READ_SIZE) {
             fwrite(res, sizeof(char), readSize - AES_BLOCK_SIZE, fp_out);
             int index = (readSize - AES_BLOCK_SIZE);
@@ -229,7 +149,7 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
             fwrite(res + index, sizeof(char), s, fp_out);
             break;
         } else {
-            int rs = fread(prevBuf, sizeof(char), FILE_READ_SIZE, fp_in);
+            int rs = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
             if (rs == 0) {
                 fwrite(res, sizeof(char), readSize - AES_BLOCK_SIZE, fp_out);
                 int index = (readSize - AES_BLOCK_SIZE);
@@ -302,19 +222,6 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
     }
     KeyExpansion(userKey, keyByteLen);
 #endif
-}
-
-void AES::SetPadding(char *data, int size) {
-    for (int i = size; i < AES_BLOCK_SIZE; i++) {
-        switch (paddingMode) {
-        case PADDING_PKCS_5:
-            data[i] = (AES_BLOCK_SIZE - size);
-            break;
-        case PADDING_ZERO:
-            data[i] = 0;
-            break;
-        }
-    }
 }
 
 int AES::GetDataSizeWithoutPadding(const char *data) {
@@ -538,6 +445,100 @@ __m128i AES::DecryptCore(__m128i data) {
         data = _mm_aesdec_si128(data, decKey[i]);
     }
     return _mm_aesdeclast_si128(data, decKey[Nr]);
+}
+
+AES::EncryptCBC::EncryptCBC(AES *obj, __m128i iv) : obj(obj), vec(iv), paddingFlag(false) {}
+
+AES::EncryptCBC::~EncryptCBC() {}
+
+int AES::EncryptCBC::Encrypt(char *res, const char *readBuf, unsigned int readSize) {
+    int writeSize = 0;
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        writeSize += AES_BLOCK_SIZE;
+        int trs = readSize - pointer;
+        int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < size; i++) {
+            t[i] = readBuf[pointer + i];
+        }
+        obj->SetPadding(t, size);
+        if (size != AES_BLOCK_SIZE) {
+            paddingFlag = true;
+        }
+
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = _mm_xor_si128(data, vec);
+        data = obj->EncryptCore(data);
+        vec = data;
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+#else
+        // TODO(no_ni)
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        EncryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = data[i];
+        }
+#endif
+    }
+    return writeSize;
+}
+
+void AES::EncryptCBC::Decrypt(char *res, const char *readBuf, unsigned int readSize) {
+    char buf[FILE_READ_SIZE];
+    memcpy(buf, readBuf, readSize);
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            t[i] = buf[pointer + i];
+        }
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i prevVec = vec;
+        vec = data;
+        data = obj->DecryptCore(data);
+        data = _mm_xor_si128(data, prevVec);
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+#else
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        DecryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = data[i];
+        }
+#endif
+    }
+}
+
+bool AES::EncryptCBC::Finalize(char *res) {
+    if (obj->paddingMode == PADDING_PKCS_5 && !paddingFlag) {
+        char t[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++)
+            t[i] = AES_BLOCK_SIZE;
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = _mm_xor_si128(data, vec);
+        data = obj->EncryptCore(data);
+        _mm_storeu_si128((__m128i *)res, data);
+#else
+        // TODO(no_ni)
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        EncryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[i] = data[i];
+        }
+#endif
+        return true;
+    }
+    return false;
 }
 
 #else

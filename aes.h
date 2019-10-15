@@ -19,6 +19,7 @@ enum Mode {
     AES_CTR,
 };
 
+// TODO(mege to Mode)
 enum PaddingMode {
     PADDING_ZERO,
     PADDING_PKCS_5,
@@ -33,25 +34,15 @@ class Error {
     ~Error() {}
 };
 
-/*
-    // Idea
-    class EncryptCBC: public EncryptBase{
-    public:
-        EncryptCBC(in_fp, out_fp, iv);
-
-        // How to run AES::EncryptCore() ?
-        Error Encrypt();
-        Error Decrypt();
-
-        // Only utility methods?
-        BeforeEncrypt();
-        AfterEncrypt();
-        Finalize();
-    }
-*/
-
 class AES {
     static const unsigned int MAX_NR = 14; // max no of rounds
+
+    class EncryptBase {
+      public:
+        virtual int Encrypt(char *res, const char *readBuf, unsigned int readSize) = 0;
+        virtual void Decrypt(char *res, const char *readBuf, unsigned int readSize) = 0;
+        virtual bool Finalize(char *res) { return false; }
+    };
 
     unsigned int Nr; // number of rounds
     Error initError;
@@ -63,8 +54,22 @@ class AES {
     int GetDataSizeWithoutPadding(const char *data);
     Error FileOpen(FILE **fp, std::string fname, std::string mode);
 #if USE_AES_NI
+    class EncryptCBC : public EncryptBase {
+        bool paddingFlag;
+        __m128i vec;
+        AES *obj;
+
+      public:
+        EncryptCBC(AES *obj, __m128i iv);
+        ~EncryptCBC();
+
+        int Encrypt(char *res, const char *readBuf, unsigned int readSize);
+        void Decrypt(char *res, const char *readBuf, unsigned int readSize);
+        bool Finalize(char *res);
+    };
+
     __m128i encKey[MAX_NR + 2], decKey[MAX_NR + 2];
-    __m128i iv, vec;
+    __m128i iv;
     __m128i AES_128_ASSIST(__m128i temp1, __m128i temp2);
     void AES_192_ASSIST(__m128i &temp1, __m128i &temp2, __m128i &temp3);
     void AES_256_ASSIST_1(__m128i &temp1, __m128i &temp2);
