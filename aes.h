@@ -54,6 +54,19 @@ class AES {
     int GetDataSizeWithoutPadding(const char *data);
     Error FileOpen(FILE **fp, std::string fname, std::string mode);
 #if USE_AES_NI
+    class EncryptECB : public EncryptBase {
+        bool paddingFlag;
+        AES *obj;
+
+      public:
+        EncryptECB(AES *obj);
+        ~EncryptECB();
+
+        int Encrypt(char *res, const char *readBuf, unsigned int readSize);
+        void Decrypt(char *res, const char *readBuf, unsigned int readSize);
+        bool Finalize(char *res);
+    };
+
     class EncryptCBC : public EncryptBase {
         bool paddingFlag;
         __m128i vec;

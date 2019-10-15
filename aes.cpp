@@ -89,7 +89,19 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     }
 
     EncryptBase *handler = nullptr;
-    handler = new EncryptCBC(this, iv);
+    switch (mode) {
+    case AES_ECB:
+        handler = new EncryptECB(this);
+        break;
+    case AES_CBC:
+        handler = new EncryptCBC(this, iv);
+        break;
+    case AES_CTR:
+        err.success = false;
+        err.message = "CTR is not implemented yet.";
+        return err;
+        break;
+    }
 
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
     while (1) {
@@ -126,7 +138,19 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
     }
 
     EncryptBase *handler = nullptr;
-    handler = new EncryptCBC(this, iv);
+    switch (mode) {
+    case AES_ECB:
+        handler = new EncryptECB(this);
+        break;
+    case AES_CBC:
+        handler = new EncryptCBC(this, iv);
+        break;
+    case AES_CTR:
+        err.success = false;
+        err.message = "CTR is not implemented yet.";
+        return err;
+        break;
+    }
 
     char buf[FILE_READ_SIZE], res[FILE_READ_SIZE];
     int readSize = fread(buf, sizeof(char), FILE_READ_SIZE, fp_in);
@@ -445,6 +469,94 @@ __m128i AES::DecryptCore(__m128i data) {
         data = _mm_aesdec_si128(data, decKey[i]);
     }
     return _mm_aesdeclast_si128(data, decKey[Nr]);
+}
+
+AES::EncryptECB::EncryptECB(AES *obj) : obj(obj), paddingFlag(false) {}
+
+AES::EncryptECB::~EncryptECB() {}
+
+int AES::EncryptECB::Encrypt(char *res, const char *readBuf, unsigned int readSize) {
+    int writeSize = 0;
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        writeSize += AES_BLOCK_SIZE;
+        int trs = readSize - pointer;
+        int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < size; i++) {
+            t[i] = readBuf[pointer + i];
+        }
+        obj->SetPadding(t, size);
+        if (size != AES_BLOCK_SIZE) {
+            paddingFlag = true;
+        }
+
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = obj->EncryptCore(data);
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+#else
+        // TODO(no_ni)
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        EncryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = data[i];
+        }
+#endif
+    }
+    return writeSize;
+}
+
+void AES::EncryptECB::Decrypt(char *res, const char *readBuf, unsigned int readSize) {
+    char buf[FILE_READ_SIZE];
+    memcpy(buf, readBuf, readSize);
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            t[i] = buf[pointer + i];
+        }
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = obj->DecryptCore(data);
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+#else
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        DecryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = data[i];
+        }
+#endif
+    }
+}
+
+bool AES::EncryptECB::Finalize(char *res) {
+    if (obj->paddingMode == PADDING_PKCS_5 && !paddingFlag) {
+        char t[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++)
+            t[i] = AES_BLOCK_SIZE;
+#if USE_AES_NI
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = obj->EncryptCore(data);
+        _mm_storeu_si128((__m128i *)res, data);
+#else
+        // TODO(no_ni)
+        unsigned char data[AES_BLOCK_SIZE];
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            data[i] = (unsigned char)t[i];
+        }
+        EncryptCore(data);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[i] = data[i];
+        }
+#endif
+        return true;
+    }
+    return false;
 }
 
 AES::EncryptCBC::EncryptCBC(AES *obj, __m128i iv) : obj(obj), vec(iv), paddingFlag(false) {}
