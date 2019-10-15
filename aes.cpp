@@ -53,7 +53,7 @@ void AES::GenerateIV(unsigned char *iv, std::string passpharse, Mode mode) {
 
 void AES::SetPadding(char *data, int size) {
     for (int i = size; i < AES_BLOCK_SIZE; i++) {
-        switch (mode) {
+        switch (paddingMode) {
         case PADDING_PKCS_5:
             data[i] = (AES_BLOCK_SIZE - size);
             break;
