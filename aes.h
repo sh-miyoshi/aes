@@ -33,6 +33,23 @@ class Error {
     ~Error() {}
 };
 
+/*
+    // Idea
+    class EncryptCBC: public EncryptBase{
+    public:
+        EncryptCBC(in_fp, out_fp, iv);
+
+        // How to run AES::EncryptCore() ?
+        Error Encrypt();
+        Error Decrypt();
+
+        // Only utility methods?
+        BeforeEncrypt();
+        AfterEncrypt();
+        Finalize();
+    }
+*/
+
 class AES {
     static const unsigned int MAX_NR = 14; // max no of rounds
 
