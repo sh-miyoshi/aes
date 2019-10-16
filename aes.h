@@ -14,15 +14,11 @@
 
 namespace aes {
 enum Mode {
-    AES_ECB,
-    AES_CBC,
+    AES_ECB_ZERO,
+    AES_ECB_PKCS_5,
+    AES_CBC_ZERO,
+    AES_CBC_PKCS_5,
     AES_CTR,
-};
-
-// TODO(mege to Mode)
-enum PaddingMode {
-    PADDING_ZERO,
-    PADDING_PKCS_5,
 };
 
 class Error {
@@ -79,10 +75,29 @@ class AES {
         bool Finalize(char *res);
     };
 
+    class EncryptCTR : public EncryptBase {
+        AES *obj;
+#if USE_AES_NI
+        __m128i vec;
+#else
+        unsigned char vec[AES_BLOCK_SIZE];
+#endif
+
+      public:
+#if USE_AES_NI
+        EncryptCTR(AES *obj, __m128i iv);
+#else
+        EncryptCTR(AES *obj, const unsigned char *iv);
+#endif
+        ~EncryptCTR();
+
+        int Encrypt(char *res, const char *readBuf, unsigned int readSize);
+        void Decrypt(char *res, const char *readBuf, unsigned int readSize);
+    };
+
     unsigned int Nr; // number of rounds
     Error initError;
     Mode mode;
-    PaddingMode paddingMode;
 
     void Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
     void SetPadding(char *data, int size);
@@ -126,11 +141,8 @@ class AES {
     static void GenerateIV(unsigned char *iv, Mode mode);
     static void GenerateIV(unsigned char *iv, std::string passpharse, Mode mode);
 
-    AES(const unsigned char *key, unsigned int keyBitLen);
     AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
     ~AES() {}
-
-    void SetPaddingMode(PaddingMode mode) { this->paddingMode = mode; }
 
     Error Encrypt(std::string in_fname, std::string out_fname);
     Error Decrypt(std::string in_fname, std::string out_fname);

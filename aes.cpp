@@ -51,24 +51,6 @@ void AES::GenerateIV(unsigned char *iv, std::string passpharse, Mode mode) {
     }
 }
 
-void AES::SetPadding(char *data, int size) {
-    for (int i = size; i < AES_BLOCK_SIZE; i++) {
-        switch (paddingMode) {
-        case PADDING_PKCS_5:
-            data[i] = (AES_BLOCK_SIZE - size);
-            break;
-        case PADDING_ZERO:
-            data[i] = 0;
-            break;
-        }
-    }
-}
-
-AES::AES(const unsigned char *key, unsigned int keyBitLen) {
-    // ECB mode is the only mode which does not use iv
-    Init(AES_ECB, key, keyBitLen, nullptr);
-}
-
 AES::AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv) {
     Init(mode, key, keyBitLen, iv);
 }
@@ -90,16 +72,16 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
 
     EncryptBase *handler = nullptr;
     switch (mode) {
-    case AES_ECB:
+    case AES_ECB_ZERO:
+    case AES_ECB_PKCS_5:
         handler = new EncryptECB(this);
         break;
-    case AES_CBC:
+    case AES_CBC_ZERO:
+    case AES_CBC_PKCS_5:
         handler = new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        err.success = false;
-        err.message = "CTR is not implemented yet.";
-        return err;
+        handler = new EncryptCTR(this, iv);
         break;
     }
 
@@ -118,6 +100,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     }
     fclose(fp_in);
     fclose(fp_out);
+    delete handler;
 
     return err;
 }
@@ -139,16 +122,16 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
 
     EncryptBase *handler = nullptr;
     switch (mode) {
-    case AES_ECB:
+    case AES_ECB_ZERO:
+    case AES_ECB_PKCS_5:
         handler = new EncryptECB(this);
         break;
-    case AES_CBC:
+    case AES_CBC_ZERO:
+    case AES_CBC_PKCS_5:
         handler = new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        err.success = false;
-        err.message = "CTR is not implemented yet.";
-        return err;
+        handler = new EncryptCTR(this, iv);
         break;
     }
 
@@ -188,13 +171,13 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
 
     fclose(fp_in);
     fclose(fp_out);
+    delete handler;
 
     return err;
 }
 
 void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv) {
     this->mode = mode;
-    this->paddingMode = PADDING_PKCS_5; // set default padding mode
 
     unsigned int keyByteLen = keyBitLen / 8; // maybe 16, 24, 32
     if (keyBitLen != 128 && keyBitLen != 192 && keyBitLen != 256) {
@@ -248,13 +231,32 @@ void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsi
 #endif
 }
 
+void AES::SetPadding(char *data, int size) {
+    for (int i = size; i < AES_BLOCK_SIZE; i++) {
+        switch (mode) {
+        case AES_ECB_ZERO:
+        case AES_CBC_ZERO:
+            data[i] = 0;
+            break;
+        case AES_ECB_PKCS_5:
+        case AES_CBC_PKCS_5:
+            data[i] = (AES_BLOCK_SIZE - size);
+            break;
+        }
+    }
+}
+
 int AES::GetDataSizeWithoutPadding(const char *data) {
     int res = 0;
-    switch (paddingMode) {
-    case PADDING_PKCS_5:
+    switch (mode) {
+    case AES_CTR:
+        return AES_BLOCK_SIZE;
+    case AES_ECB_PKCS_5:
+    case AES_CBC_PKCS_5:
         res = AES_BLOCK_SIZE - data[AES_BLOCK_SIZE - 1];
         break;
-    case PADDING_ZERO:
+    case AES_ECB_ZERO:
+    case AES_CBC_ZERO:
         for (res = AES_BLOCK_SIZE - 1; res >= 0; res--) {
             if (data[res] != 0) {
                 res++;
@@ -341,7 +343,10 @@ void AES::EncryptECB::Decrypt(char *res, const char *readBuf, unsigned int readS
 }
 
 bool AES::EncryptECB::Finalize(char *res) {
-    if (obj->paddingMode == PADDING_PKCS_5 && !paddingFlag) {
+    if (obj->mode != AES_ECB_PKCS_5 && obj->mode != AES_CBC_PKCS_5) {
+        return false;
+    }
+    if (!paddingFlag) {
         char t[AES_BLOCK_SIZE];
         for (int i = 0; i < AES_BLOCK_SIZE; i++)
             t[i] = AES_BLOCK_SIZE;
@@ -455,7 +460,11 @@ void AES::EncryptCBC::Decrypt(char *res, const char *readBuf, unsigned int readS
 }
 
 bool AES::EncryptCBC::Finalize(char *res) {
-    if (obj->paddingMode == PADDING_PKCS_5 && !paddingFlag) {
+    if (obj->mode != AES_ECB_PKCS_5 && obj->mode != AES_CBC_PKCS_5) {
+        return false;
+    }
+
+    if (!paddingFlag) {
         char t[AES_BLOCK_SIZE];
         for (int i = 0; i < AES_BLOCK_SIZE; i++)
             t[i] = AES_BLOCK_SIZE;
@@ -465,7 +474,6 @@ bool AES::EncryptCBC::Finalize(char *res) {
         data = obj->EncryptCore(data);
         _mm_storeu_si128((__m128i *)res, data);
 #else
-        // TODO(no_ni)
         unsigned char data[AES_BLOCK_SIZE];
         for (int i = 0; i < AES_BLOCK_SIZE; i++) {
             data[i] = (unsigned char)t[i];
@@ -481,6 +489,75 @@ bool AES::EncryptCBC::Finalize(char *res) {
         return true;
     }
     return false;
+}
+
+#if USE_AES_NI
+AES::EncryptCTR::EncryptCTR(AES *obj, __m128i iv) : obj(obj), vec(iv) {}
+#else
+AES::EncryptCTR::EncryptCTR(AES *obj, const unsigned char *iv) : obj(obj) {
+    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+        vec[i] = iv[i];
+    }
+}
+#endif
+AES::EncryptCTR::~EncryptCTR() {}
+
+int AES::EncryptCTR::Encrypt(char *res, const char *readBuf, unsigned int readSize) {
+    int writeSize = 0;
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        int trs = readSize - pointer;
+        int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < size; i++) {
+            t[i] = readBuf[pointer + i];
+        }
+#if USE_AES_NI
+        const __m128i one = _mm_set_epi32(0, 0, 0, 1);
+        __m128i encCounter = obj->EncryptCore(vec);
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = _mm_xor_si128(data, encCounter);
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+        vec = _mm_add_epi64(vec, one);
+#else
+        unsigned char encCounter[AES_BLOCK_SIZE];
+        for (int i = 0; i < 16; i++) {
+            encCounter[i] = vec[i];
+        }
+        obj->EncryptCore(encCounter);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = (char)((unsigned char)t[i] ^ encCounter[i]);
+        }
+#endif
+    }
+    return readSize;
+}
+
+void AES::EncryptCTR::Decrypt(char *res, const char *readBuf, unsigned int readSize) {
+    for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
+        int trs = readSize - pointer;
+        int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
+        char t[AES_BLOCK_SIZE] = { 0 };
+        for (int i = 0; i < size; i++) {
+            t[i] = readBuf[pointer + i];
+        }
+#if USE_AES_NI
+        const __m128i one = _mm_set_epi32(0, 0, 0, 1);
+        __m128i encCounter = obj->EncryptCore(vec);
+        __m128i data = _mm_loadu_si128((__m128i *)t);
+        data = _mm_xor_si128(data, encCounter);
+        _mm_storeu_si128((__m128i *)(res + pointer), data);
+        vec = _mm_add_epi64(vec, one);
+#else
+        unsigned char encCounter[AES_BLOCK_SIZE];
+        for (int i = 0; i < 16; i++) {
+            encCounter[i] = vec[i];
+        }
+        obj->EncryptCore(encCounter);
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            res[pointer + i] = (char)((unsigned char)t[i] ^ encCounter[i]);
+        }
+#endif
+    }
 }
 
 #if USE_AES_NI

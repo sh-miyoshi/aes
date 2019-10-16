@@ -33,10 +33,10 @@ int main(int argc, char *argv[]) {
     opt.AddHelpMessage("aes.exe (--enc or --dec) [options] <input-file-name> <output-file-name>");
     opt.AddDefine("--enc", "", false, "Run as Encryption mode");
     opt.AddDefine("--dec", "", false, "Run as Decryption mode");
-    opt.AddDefine("-m", "--mode", true, "AES mode (ecb, cbc, ctr) default: cbc");
+    opt.AddDefine("-m", "--mode", true, "AES mode (ecb, cbc, ctr) default: ctr");
     opt.AddDefine("-p", "--password", true, "pass pharse of secret key");
     opt.AddDefine("-l", "--key-len", true, "AES key length (128, 192, 256) default: 256");
-    opt.AddDefine("--padding", "", true, "padding mode of AES (zero, pkcs5) default: pkcs5");
+    opt.AddDefine("--padding", "", true, "padding mode of AES (zero, pkcs5), ignored if CTR mode default: pkcs5");
     opt.AddDefine("-?", "--help", false, "show this help message");
 
     if (!opt.ParseArguments(argc, argv)) {
@@ -47,9 +47,8 @@ int main(int argc, char *argv[]) {
 
     // Set default value to variables
     RunMode runMode = RUN_UNDEFINED;
-    aes::Mode aesMode = aes::AES_CBC;
+    aes::Mode aesMode = aes::AES_CTR;
     unsigned int keyLen = 256;
-    aes::PaddingMode paddingMode = aes::PADDING_PKCS_5;
     std::string passpharse;
 
     // Check command line options
@@ -85,9 +84,9 @@ int main(int argc, char *argv[]) {
             passpharse = opt_val.second;
         } else if (opt_val.first == "-m" || opt_val.first == "--mode") {
             if (opt_val.second == "ecb") {
-                aesMode = aes::AES_ECB;
+                aesMode = aes::AES_ECB_PKCS_5;
             } else if (opt_val.second == "cbc") {
-                aesMode = aes::AES_CBC;
+                aesMode = aes::AES_CBC_PKCS_5;
             } else if (opt_val.second == "ctr") {
                 aesMode = aes::AES_CTR;
             } else {
@@ -96,10 +95,11 @@ int main(int argc, char *argv[]) {
             }
         } else if (opt_val.first == "--padding") {
             if (opt_val.second == "zero") {
-                paddingMode = aes::PADDING_ZERO;
-            } else if (opt_val.second == "pkcs5") {
-                paddingMode = aes::PADDING_PKCS_5;
-            } else {
+                if (aesMode == aes::AES_CBC_PKCS_5)
+                    aesMode = aes::AES_CBC_ZERO;
+                if (aesMode == aes::AES_ECB_PKCS_5)
+                    aesMode = aes::AES_ECB_ZERO;
+            } else if (opt_val.second != "pkcs5") {
                 std::cerr << "Unknown padding mode <" << opt_val.second << "> was given." << std::endl;
                 return 1;
             }
@@ -131,7 +131,6 @@ int main(int argc, char *argv[]) {
 
     // Run AES
     aes::AES handler(aesMode, key, keyLen, iv);
-    handler.SetPaddingMode(paddingMode);
 
     if (runMode == RUN_ENCRYPT) {
         handler.Encrypt(args[0], args[1]);
