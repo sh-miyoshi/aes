@@ -53,7 +53,7 @@ int main() {
     unsigned char key[16] = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
     };
-    aes::AES::GenerateIV(iv, aes::AES_ECB);
+    aes::AES::GenerateIV(iv, aes::AES_CTR);
 
     // printf("iv: (");
     // for (int i = 0; i < 16; i++) {
@@ -65,7 +65,7 @@ int main() {
     // puts(")");
 
     // create handler with 128-bit key length, cbc mode, (padding is PSCK#5)
-    aes::AES handler(aes::AES_CBC, key, 128, iv);
+    aes::AES handler(aes::AES_CTR, key, 128, iv);
 
     // Encryption
     aes::Error err = handler.Encrypt(input_fname, encrypt_fname);
