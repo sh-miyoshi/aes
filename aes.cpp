@@ -503,7 +503,6 @@ AES::EncryptCTR::EncryptCTR(AES *obj, const unsigned char *iv) : obj(obj) {
 AES::EncryptCTR::~EncryptCTR() {}
 
 int AES::EncryptCTR::Encrypt(char *res, const char *readBuf, unsigned int readSize) {
-    int writeSize = 0;
     for (int pointer = 0; pointer < readSize; pointer += AES_BLOCK_SIZE) {
         int trs = readSize - pointer;
         int size = (trs > AES_BLOCK_SIZE) ? AES_BLOCK_SIZE : trs;
@@ -512,9 +511,10 @@ int AES::EncryptCTR::Encrypt(char *res, const char *readBuf, unsigned int readSi
             t[i] = readBuf[pointer + i];
         }
 #if USE_AES_NI
-        const __m128i one = _mm_set_epi32(0, 0, 0, 1);
+        static const __m128i one = _mm_set_epi32(0, 0, 0, 1);
         __m128i encCounter = obj->EncryptCore(vec);
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+	__m128i data = _mm_set_epi8(t[15],t[14],t[13],t[12],t[11],t[10],t[9],t[8],t[7],t[6],t[5],t[4],t[3],t[2],t[1],t[0]);
+        //__m128i data = _mm_loadu_si128((__m128i *)t);
         data = _mm_xor_si128(data, encCounter);
         _mm_storeu_si128((__m128i *)(res + pointer), data);
         vec = _mm_add_epi64(vec, one);
