@@ -300,7 +300,7 @@ int AES::EncryptECB::Encrypt(char *res, const char *readBuf, unsigned int readSi
         }
 
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = obj->EncryptCore(data);
         _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
@@ -326,7 +326,7 @@ void AES::EncryptECB::Decrypt(char *res, const char *readBuf, unsigned int readS
             t[i] = buf[pointer + i];
         }
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = obj->DecryptCore(data);
         _mm_storeu_si128((__m128i *)(res + pointer), data);
 #else
@@ -351,7 +351,7 @@ bool AES::EncryptECB::Finalize(char *res) {
         for (int i = 0; i < AES_BLOCK_SIZE; i++)
             t[i] = AES_BLOCK_SIZE;
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = obj->EncryptCore(data);
         _mm_storeu_si128((__m128i *)res, data);
 #else
@@ -397,7 +397,7 @@ int AES::EncryptCBC::Encrypt(char *res, const char *readBuf, unsigned int readSi
         }
 
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = _mm_xor_si128(data, vec);
         data = obj->EncryptCore(data);
         vec = data;
@@ -431,7 +431,7 @@ void AES::EncryptCBC::Decrypt(char *res, const char *readBuf, unsigned int readS
             t[i] = buf[pointer + i];
         }
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         __m128i prevVec = vec;
         vec = data;
         data = obj->DecryptCore(data);
@@ -469,7 +469,7 @@ bool AES::EncryptCBC::Finalize(char *res) {
         for (int i = 0; i < AES_BLOCK_SIZE; i++)
             t[i] = AES_BLOCK_SIZE;
 #if USE_AES_NI
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = _mm_xor_si128(data, vec);
         data = obj->EncryptCore(data);
         _mm_storeu_si128((__m128i *)res, data);
@@ -513,8 +513,7 @@ int AES::EncryptCTR::Encrypt(char *res, const char *readBuf, unsigned int readSi
 #if USE_AES_NI
         static const __m128i one = _mm_set_epi32(0, 0, 0, 1);
         __m128i encCounter = obj->EncryptCore(vec);
-	__m128i data = _mm_set_epi8(t[15],t[14],t[13],t[12],t[11],t[10],t[9],t[8],t[7],t[6],t[5],t[4],t[3],t[2],t[1],t[0]);
-        //__m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = _mm_xor_si128(data, encCounter);
         _mm_storeu_si128((__m128i *)(res + pointer), data);
         vec = _mm_add_epi64(vec, one);
@@ -543,7 +542,7 @@ void AES::EncryptCTR::Decrypt(char *res, const char *readBuf, unsigned int readS
 #if USE_AES_NI
         const __m128i one = _mm_set_epi32(0, 0, 0, 1);
         __m128i encCounter = obj->EncryptCore(vec);
-        __m128i data = _mm_loadu_si128((__m128i *)t);
+        __m128i data = _mm_set_epi8(t[15], t[14], t[13], t[12], t[11], t[10], t[9], t[8], t[7], t[6], t[5], t[4], t[3], t[2], t[1], t[0]);
         data = _mm_xor_si128(data, encCounter);
         _mm_storeu_si128((__m128i *)(res + pointer), data);
         vec = _mm_add_epi64(vec, one);
