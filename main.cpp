@@ -133,9 +133,9 @@ int main(int argc, char *argv[]) {
     aes::AES handler(aesMode, key, keyLen, iv);
 
     if (runMode == RUN_ENCRYPT) {
-        handler.Encrypt(args[0], args[1]);
+        handler.EncryptFile(args[0], args[1]);
     } else if (runMode == RUN_DECRYPT) {
-        handler.Decrypt(args[0], args[1]);
+        handler.DecryptFile(args[0], args[1]);
     }
 
 #ifdef TIME_MEASUREMENT

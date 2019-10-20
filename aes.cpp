@@ -74,14 +74,14 @@ Error AES::EncryptFile(std::string in_fname, std::string out_fname) {
     switch (mode) {
     case AES_ECB_ZERO:
     case AES_ECB_PKCS_5:
-        handler = new EncryptECB(this);
+        handler = (EncryptBase *)new EncryptECB(this);
         break;
     case AES_CBC_ZERO:
     case AES_CBC_PKCS_5:
-        handler = new EncryptCBC(this, iv);
+        handler = (EncryptBase *)new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        handler = new EncryptCTR(this, iv);
+        handler = (EncryptBase *)new EncryptCTR(this, iv);
         break;
     }
 
@@ -124,14 +124,14 @@ Error AES::DecryptFile(std::string in_fname, std::string out_fname) {
     switch (mode) {
     case AES_ECB_ZERO:
     case AES_ECB_PKCS_5:
-        handler = new EncryptECB(this);
+        handler = (EncryptBase *)new EncryptECB(this);
         break;
     case AES_CBC_ZERO:
     case AES_CBC_PKCS_5:
-        handler = new EncryptCBC(this, iv);
+        handler = (EncryptBase *)new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        handler = new EncryptCTR(this, iv);
+        handler = (EncryptBase *)new EncryptCTR(this, iv);
         break;
     }
 
@@ -185,14 +185,14 @@ Error AES::EncryptString(char *result, const char *data, unsigned int length) {
     switch (mode) {
     case AES_ECB_ZERO:
     case AES_ECB_PKCS_5:
-        handler = new EncryptECB(this);
+        handler = (EncryptBase *)new EncryptECB(this);
         break;
     case AES_CBC_ZERO:
     case AES_CBC_PKCS_5:
-        handler = new EncryptCBC(this, iv);
+        handler = (EncryptBase *)new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        handler = new EncryptCTR(this, iv);
+        handler = (EncryptBase *)new EncryptCTR(this, iv);
         break;
     }
 
@@ -211,14 +211,14 @@ Error AES::DecryptString(char *result, const char *data, unsigned int length) {
     switch (mode) {
     case AES_ECB_ZERO:
     case AES_ECB_PKCS_5:
-        handler = new EncryptECB(this);
+        handler = (EncryptBase *)new EncryptECB(this);
         break;
     case AES_CBC_ZERO:
     case AES_CBC_PKCS_5:
-        handler = new EncryptCBC(this, iv);
+        handler = (EncryptBase *)new EncryptCBC(this, iv);
         break;
     case AES_CTR:
-        handler = new EncryptCTR(this, iv);
+        handler = (EncryptBase *)new EncryptCTR(this, iv);
         break;
     }
 
