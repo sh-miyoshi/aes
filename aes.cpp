@@ -55,7 +55,7 @@ AES::AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned c
     Init(mode, key, keyBitLen, iv);
 }
 
-Error AES::Encrypt(std::string in_fname, std::string out_fname) {
+Error AES::EncryptFile(std::string in_fname, std::string out_fname) {
     if (!initError.success) {
         return initError;
     }
@@ -105,7 +105,7 @@ Error AES::Encrypt(std::string in_fname, std::string out_fname) {
     return err;
 }
 
-Error AES::Decrypt(std::string in_fname, std::string out_fname) {
+Error AES::DecryptFile(std::string in_fname, std::string out_fname) {
     if (!initError.success) {
         return initError;
     }
@@ -174,6 +174,58 @@ Error AES::Decrypt(std::string in_fname, std::string out_fname) {
     delete handler;
 
     return err;
+}
+
+Error AES::EncryptString(char *result, const char *data, unsigned int length) {
+    if (!initError.success) {
+        return initError;
+    }
+
+    EncryptBase *handler = nullptr;
+    switch (mode) {
+    case AES_ECB_ZERO:
+    case AES_ECB_PKCS_5:
+        handler = new EncryptECB(this);
+        break;
+    case AES_CBC_ZERO:
+    case AES_CBC_PKCS_5:
+        handler = new EncryptCBC(this, iv);
+        break;
+    case AES_CTR:
+        handler = new EncryptCTR(this, iv);
+        break;
+    }
+
+    handler->Encrypt(result, data, length);
+    delete handler;
+
+    return Error();
+}
+
+Error AES::DecryptString(char *result, const char *data, unsigned int length) {
+    if (!initError.success) {
+        return initError;
+    }
+
+    EncryptBase *handler = nullptr;
+    switch (mode) {
+    case AES_ECB_ZERO:
+    case AES_ECB_PKCS_5:
+        handler = new EncryptECB(this);
+        break;
+    case AES_CBC_ZERO:
+    case AES_CBC_PKCS_5:
+        handler = new EncryptCBC(this, iv);
+        break;
+    case AES_CTR:
+        handler = new EncryptCTR(this, iv);
+        break;
+    }
+
+    handler->Decrypt(result, data, length);
+    delete handler;
+
+    return Error();
 }
 
 void AES::Init(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv) {

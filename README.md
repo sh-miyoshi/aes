@@ -64,18 +64,18 @@ int main() {
     // }
     // puts(")");
 
-    // create handler with 128-bit key length, cbc mode, (padding is PSCK#5)
+    // create handler with 128-bit key length, CTR mode
     aes::AES handler(aes::AES_CTR, key, 128, iv);
 
     // Encryption
-    aes::Error err = handler.Encrypt(input_fname, encrypt_fname);
+    aes::Error err = handler.EncryptFile(input_fname, encrypt_fname);
     if (!err.success) {
         printf("Failed to encrypt: %s\n", err.message.c_str());
         return 1;
     }
 
     // Decryption
-    err = handler.Decrypt(encrypt_fname, result_fname);
+    err = handler.DecryptFile(encrypt_fname, result_fname);
     if (!err.success) {
         printf("Failed to decrypt: %s\n", err.message.c_str());
         return 1;

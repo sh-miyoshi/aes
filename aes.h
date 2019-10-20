@@ -144,7 +144,10 @@ class AES {
     AES(Mode mode, const unsigned char *key, unsigned int keyBitLen, unsigned char *iv);
     ~AES() {}
 
-    Error Encrypt(std::string in_fname, std::string out_fname);
-    Error Decrypt(std::string in_fname, std::string out_fname);
+    Error EncryptFile(std::string in_fname, std::string out_fname);
+    Error DecryptFile(std::string in_fname, std::string out_fname);
+
+    Error EncryptString(char *result, const char *data, unsigned int length);
+    Error DecryptString(char *result, const char *data, unsigned int length);
 };
 }; // namespace aes
