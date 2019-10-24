@@ -58,7 +58,7 @@ class CommandHelp {
             // show value
             msg += data[TYPE_VALUE][i];
             len += data[TYPE_VALUE][i].length();
-            for (auto i = len; i < maxLen; i++) {
+            for (unsigned int j = len; j < maxLen; j++) {
                 msg += " ";
             }
             msg += " ";
